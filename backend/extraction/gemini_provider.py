@@ -34,8 +34,8 @@ class GeminiProvider(BaseLLMProvider):
         else:
             self._api_key = api_key
 
-        self._model_name = (model_name or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")).strip()
-        self._fallback_model = (fallback_model or os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash")).strip()
+        self._model_name = (model_name or os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")).strip()
+        self._fallback_model = (fallback_model or os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.7-flash")).strip()
         self._fallback_models = [m for m in [self._fallback_model, "gemini-3.5-flash", "gemini-3.1-flash-lite"] if m and m != self._model_name]
         self._max_retries = max_retries
         self._timeout = timeout_seconds

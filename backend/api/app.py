@@ -1,13 +1,18 @@
-# -*- coding: utf-8 -*-
+import asyncio
 import hashlib
+import json
+import logging
 import os
 import shutil
 import tempfile
-from typing import List, Optional
+import threading
+from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
+
+logger = logging.getLogger(__name__)
 
 from backend.config import load_dotenv
 from backend.extraction.models import LLMMode, LLMProviderError
@@ -220,6 +225,100 @@ async def verify_bid(
             shutil.rmtree(temp_dir)
         except Exception:
             pass
+
+@app.post("/api/v1/verify-stream")
+async def verify_bid_stream(
+    tender_file: UploadFile = File(..., description="Tender document PDF"),
+    bid_files: List[UploadFile] = File(..., description="Bidder submission PDF(s)"),
+    tender_id: Optional[str] = Form(None),
+    bid_id: Optional[str] = Form(None),
+    company_name: Optional[str] = Form(None),
+    mode: Optional[str] = Form("live"),
+):
+    """
+    Streaming Bid Verification Endpoint.
+    Streams real-time stage progress events (Steps 1 through 6) via SSE as the
+    deterministic verification pipeline executes in the backend.
+    """
+    if not bid_files:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one bidder document must be uploaded.",
+        )
+
+    temp_dir = tempfile.mkdtemp(prefix="gem_verif_stream_")
+    try:
+        tender_path = _validate_and_save_file(tender_file, temp_dir)
+        bid_paths = [_validate_and_save_file(bf, temp_dir) for bf in bid_files]
+    except Exception as e:
+        shutil.rmtree(temp_dir, ignore_errors=True)
+        raise e
+
+    orch = get_orchestrator(mode or "live")
+    loop = asyncio.get_running_loop()
+    queue: asyncio.Queue = asyncio.Queue()
+
+    def sync_progress_callback(step: int, stage_status: str, message: str, meta: Optional[Dict[str, Any]] = None):
+        payload = {
+            "event": "STAGE_PROGRESS",
+            "step": step,
+            "status": stage_status,
+            "message": message,
+            "meta": meta or {},
+        }
+        loop.call_soon_threadsafe(queue.put_nowait, payload)
+
+    def worker():
+        try:
+            aggregated, _ = orch.verify_submission(
+                tender_document_path=tender_path,
+                bid_document_paths=bid_paths,
+                tender_id=tender_id,
+                bid_id=bid_id,
+                company_name_hint=company_name,
+                progress_callback=sync_progress_callback,
+            )
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"event": "VERIFICATION_COMPLETED", "result": aggregated.to_dict()},
+            )
+        except LLMProviderError as lpe:
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"event": "VERIFICATION_FAILED", "error": f"Live verification provider failure: {str(lpe)}"},
+            )
+        except Exception as exc:
+            logger.exception("Error during streamed verification")
+            loop.call_soon_threadsafe(
+                queue.put_nowait,
+                {"event": "VERIFICATION_FAILED", "error": str(exc)},
+            )
+        finally:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+    async def sse_generator():
+        threading.Thread(target=worker, daemon=True).start()
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield f"data: {json.dumps(item)}\n\n"
+        finally:
+            try:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception:
+                pass
+
+    return StreamingResponse(
+        sse_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @app.get(
     "/api/v1/verifications",

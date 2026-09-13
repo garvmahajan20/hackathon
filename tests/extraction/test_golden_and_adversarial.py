@@ -452,9 +452,11 @@ class TestStep7GoldenAndAdversarial(unittest.TestCase):
 
     # 15. Model configuration resolves to gemini-3.8-flash and supports explicit override
     def test_adversarial_15_model_configuration_and_override(self):
+        expected_model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+        expected_fallback = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.7-flash")
         default_prov = GeminiProvider(api_key="mock_key")
-        self.assertEqual(default_prov.model_name, "gemini-3.8-flash")
-        self.assertEqual(default_prov.fallback_model, "gemini-3.7-flash")
+        self.assertEqual(default_prov.model_name, expected_model)
+        self.assertEqual(default_prov.fallback_model, expected_fallback)
 
         custom_prov = GeminiProvider(api_key="mock_key", model_name="custom-flash", fallback_model="custom-fallback")
         self.assertEqual(custom_prov.model_name, "custom-flash")

@@ -107,7 +107,9 @@ class VerificationAggregator:
 
         # Determine Compliance Status
         effective_compliance = total_compliance - na_count
-        if critical_fails > 0 or major_fails > 0:
+        if total_compliance == 0:
+            compliance_status = ComplianceStatus.REVIEW.value
+        elif critical_fails > 0 or major_fails > 0:
             compliance_status = ComplianceStatus.FAIL.value
         elif missing_count > 0:
             compliance_status = ComplianceStatus.MISSING.value
@@ -115,7 +117,7 @@ class VerificationAggregator:
             compliance_status = ComplianceStatus.REVIEW.value
         elif pass_count == effective_compliance and effective_compliance > 0:
             compliance_status = ComplianceStatus.PASS.value
-        elif effective_compliance == 0:
+        elif effective_compliance == 0 and total_compliance > 0:
             compliance_status = ComplianceStatus.PASS.value
         else:
             compliance_status = ComplianceStatus.REVIEW.value if total_compliance == 0 else ComplianceStatus.PARTIAL.value
@@ -219,6 +221,19 @@ class VerificationAggregator:
                 evidence_references=[],
                 source_documents=[],
                 source_pages=[],
+                verification_id=verification_id,
+            ))
+
+        # If no verifiable compliance requirements evaluated and no existing review items, flag for manual inspection
+        if total_compliance == 0 and len(human_review_items) == 0:
+            review_idx += 1
+            human_review_items.append(HumanReviewItem(
+                review_id=f"REV-{bid_id}-{review_idx:03d}",
+                bid_id=bid_id,
+                tender_id=tender_id,
+                category=ReviewCategory.MANUAL_INSPECTION.value,
+                severity="CRITICAL",
+                reason="No verifiable compliance requirements were extracted or evaluated from the tender document.",
                 verification_id=verification_id,
             ))
 

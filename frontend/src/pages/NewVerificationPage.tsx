@@ -18,7 +18,7 @@ import {
   Layers,
 } from "lucide-react";
 import { CANONICAL_DEMO_CASES, SEEDED_DEMO_VERIFICATIONS } from "../data/demoCases";
-import { apiClient } from "../api/client";
+import { apiClient, StageProgressEvent } from "../api/client";
 import { AggregatedVerification } from "../types";
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024;
@@ -32,10 +32,22 @@ const PIPELINE_STAGES = [
   { step: 6, label: "Audit Dossier Compilation & Sealing", layer: "Orchestration" },
 ];
 
+export interface StageState {
+  status: "idle" | "running" | "completed" | "failed";
+  message?: string;
+}
+
+const INITIAL_STAGES: Record<number, StageState> = {
+  1: { status: "idle" },
+  2: { status: "idle" },
+  3: { status: "idle" },
+  4: { status: "idle" },
+  5: { status: "idle" },
+  6: { status: "idle" },
+};
+
 export const NewVerificationPage: React.FC = () => {
   const navigate = useNavigate();
-  const intervalRef = useRef<number | null>(null);
-  const timeoutRef = useRef<number | null>(null);
 
   // Workflow mode: "live" (real backend verification) or "demo" (canonical showcase)
   const [activeTab, setActiveTab] = useState<"live" | "demo">("live");
@@ -50,14 +62,10 @@ export const NewVerificationPage: React.FC = () => {
   // Pipeline execution & error state
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [currentStage, setCurrentStage] = useState(0);
+  const [currentStageNumber, setCurrentStageNumber] = useState(0);
+  const [stageStates, setStageStates] = useState<Record<number, StageState>>(INITIAL_STAGES);
   const [isComplete, setIsComplete] = useState(false);
   const [completedResult, setCompletedResult] = useState<AggregatedVerification | null>(null);
-
-  useEffect(() => () => {
-    if (intervalRef.current) window.clearInterval(intervalRef.current);
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-  }, []);
 
   const validatePdf = (file: File, context: "tender" | "bid") => {
     if (!file.name.toLowerCase().endsWith(".pdf")) {
@@ -115,7 +123,7 @@ export const NewVerificationPage: React.FC = () => {
     setBidFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Execution: Live Backend Verification
+  // Execution: Live Backend Verification driven strictly by real backend stage progression
   const executeLivePipeline = async () => {
     if (!tenderFile) {
       setValidationError("Please select or drop a valid Tender Specification PDF.");
@@ -126,22 +134,12 @@ export const NewVerificationPage: React.FC = () => {
       return;
     }
 
-    if (intervalRef.current) window.clearInterval(intervalRef.current);
-    if (timeoutRef.current) window.clearTimeout(timeoutRef.current);
-
     setValidationError(null);
     setIsProcessing(true);
     setIsComplete(false);
     setCompletedResult(null);
-    setCurrentStage(1);
-
-    // Realistic UI progression through early stages while backend executes
-    intervalRef.current = window.setInterval(() => {
-      setCurrentStage((prev) => {
-        if (prev < 5) return prev + 1;
-        return 5;
-      });
-    }, 650);
+    setCurrentStageNumber(0);
+    setStageStates({ ...INITIAL_STAGES });
 
     const formData = new FormData();
     formData.append("tender_file", tenderFile);
@@ -153,15 +151,42 @@ export const NewVerificationPage: React.FC = () => {
     if (companyName.trim()) formData.append("company_name", companyName.trim());
     formData.append("mode", "live");
 
-    try {
-      const result = await apiClient.verifyBid(formData);
+    const onProgress = (evt: StageProgressEvent) => {
+      const step = evt.step;
+      const status: "running" | "completed" | "failed" =
+        evt.status === "RUNNING"
+          ? "running"
+          : evt.status === "COMPLETED"
+          ? "completed"
+          : "failed";
 
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
+      setStageStates((prev) => ({
+        ...prev,
+        [step]: {
+          status,
+          message: evt.message,
+        },
+      }));
+
+      if (evt.status === "RUNNING") {
+        setCurrentStageNumber(step);
       }
+    };
 
-      setCurrentStage(6);
+    try {
+      const result = await apiClient.verifyBidStream(formData, onProgress);
+
+      // Verify all stages marked completed upon receiving verified dossier
+      setStageStates((prev) => {
+        const next: Record<number, StageState> = { ...prev };
+        for (let i = 1; i <= 6; i++) {
+          if (next[i]?.status !== "failed") {
+            next[i] = { ...next[i], status: "completed" };
+          }
+        }
+        return next;
+      });
+
       setIsComplete(true);
       setIsProcessing(false);
       setCompletedResult(result);
@@ -176,13 +201,19 @@ export const NewVerificationPage: React.FC = () => {
         console.warn("Could not persist recent verification ID:", storageErr);
       }
     } catch (err: any) {
-      if (intervalRef.current) {
-        window.clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
       setIsProcessing(false);
       setIsComplete(false);
-      setCurrentStage(0);
+
+      setStageStates((prev) => {
+        const next: Record<number, StageState> = { ...prev };
+        if (currentStageNumber > 0 && next[currentStageNumber]) {
+          next[currentStageNumber] = {
+            status: "failed",
+            message: err.detail || err.message || "Pipeline stage execution failed",
+          };
+        }
+        return next;
+      });
 
       const isOffline =
         err.status === 0 ||
@@ -562,7 +593,9 @@ export const NewVerificationPage: React.FC = () => {
                     <Play className="h-4 w-4" />
                   )}
                   {isProcessing
-                    ? `Verifying Submission · Step ${currentStage}/6`
+                    ? currentStageNumber > 0
+                      ? `Verifying Submission · Step ${currentStageNumber}/6`
+                      : "Initiating Verification Pipeline..."
                     : "Run verification pipeline"}
                 </button>
               </div>
@@ -572,32 +605,42 @@ export const NewVerificationPage: React.FC = () => {
               <div className="p-4">
                 <div className="grid grid-cols-2 gap-2 md:grid-cols-6">
                   {PIPELINE_STAGES.map((stage) => {
-                    const done = currentStage > stage.step || isComplete;
-                    const current = currentStage === stage.step && !isComplete;
+                    const state = stageStates[stage.step] || { status: "idle" };
+                    const isDone = state.status === "completed";
+                    const isRunning = state.status === "running";
+                    const isFailed = state.status === "failed";
+
                     return (
                       <div
                         key={stage.step}
+                        data-testid={`pipeline-stage-${stage.step}`}
                         className={`rounded-lg border p-2.5 transition-all ${
-                          done
+                          isDone
                             ? "border-emerald-200 bg-emerald-50"
-                            : current
+                            : isRunning
                               ? "border-blue-400 bg-blue-50 ring-1 ring-blue-300"
-                              : "border-slate-200 bg-slate-50"
+                              : isFailed
+                                ? "border-rose-300 bg-rose-50 ring-1 ring-rose-200"
+                                : "border-slate-200 bg-slate-50 opacity-75"
                         }`}
                       >
                         <div className="flex items-center justify-between font-mono text-[9px] font-bold uppercase text-slate-500">
                           <span>Step {stage.step}</span>
-                          {done ? (
+                          {isDone ? (
                             <CheckCircle2 className="h-3 w-3 text-emerald-600" />
-                          ) : current ? (
+                          ) : isRunning ? (
                             <Loader2 className="h-3 w-3 animate-spin text-blue-600" />
-                          ) : null}
+                          ) : isFailed ? (
+                            <AlertTriangle className="h-3 w-3 text-rose-600" />
+                          ) : (
+                            <span className="h-1.5 w-1.5 rounded-full bg-slate-300 inline-block" />
+                          )}
                         </div>
                         <p className="mt-1.5 line-clamp-2 text-[10px] font-semibold leading-4 text-slate-800">
                           {stage.label}
                         </p>
-                        <p className="mt-1 truncate text-[8px] text-slate-400">
-                          {stage.layer}
+                        <p className="mt-1 truncate text-[8px] text-slate-400" title={state.message || stage.layer}>
+                          {state.message || stage.layer}
                         </p>
                       </div>
                     );

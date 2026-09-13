@@ -154,5 +154,64 @@ class TestStep8Api(unittest.TestCase):
         self.assertIn("bid_id", first)
         self.assertIn("category", first)
 
+    # 14. Verify streamed verification endpoint yields truthful SSE events
+    def test_14_verify_stream_endpoint(self):
+        import json
+        with open(self.tender_pdf, "rb") as tf, open(self.bid_pdf, "rb") as bf:
+            files = [
+                ("tender_file", ("TENDER-0001.pdf", tf.read(), "application/pdf")),
+                ("bid_files", ("BID-00001.pdf", bf.read(), "application/pdf")),
+            ]
+            data = {
+                "tender_id": "TENDER-0001",
+                "bid_id": "BID-00001",
+                "company_name": "Bharat Devices",
+                "mode": "mock",
+            }
+            resp = self.client.post("/api/v1/verify-stream", files=files, data=data)
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/event-stream", resp.headers.get("content-type", ""))
+
+        events = []
+        for line in resp.text.splitlines():
+            line = line.strip()
+            if line.startswith("data:"):
+                payload = json.loads(line[5:].strip())
+                events.append(payload)
+
+        # Confirm we received stage progress events for stages 1 to 6
+        stage_steps = [e["step"] for e in events if e.get("event") == "STAGE_PROGRESS"]
+        self.assertTrue(all(s in stage_steps for s in [1, 2, 3, 4, 5, 6]))
+
+        # Confirm completion event
+        completion_events = [e for e in events if e.get("event") == "VERIFICATION_COMPLETED"]
+        self.assertEqual(len(completion_events), 1)
+        result = completion_events[0]["result"]
+        self.assertEqual(result["tender_id"], "TENDER-0001")
+        self.assertEqual(result["bid_id"], "BID-00001")
+        self.assertIn("verification_id", result)
+
+    # 15. Verify that 0 requirements run returns REVIEW and never PASS
+    def test_15_zero_requirements_never_pass(self):
+        from backend.orchestration.aggregator import VerificationAggregator
+        aggregator = VerificationAggregator()
+        res = aggregator.aggregate(
+            tender_id="TENDER-EMPTY",
+            bid_id="BID-EMPTY",
+            compliance_results=[],
+            integrity_findings=[],
+            government_responses=[],
+            requirements=[],
+            facts=[],
+        )
+        self.assertNotEqual(res.compliance_status, "PASS")
+        self.assertNotEqual(res.overall_status, "PASS")
+        self.assertEqual(res.compliance_status, "REVIEW")
+        self.assertEqual(res.overall_status, "REVIEW")
+        # Must contain critical review item
+        reasons = [item.get("reason", "") if isinstance(item, dict) else getattr(item, "reason", "") for item in res.human_review_items]
+        self.assertTrue(any("No verifiable compliance requirements" in r for r in reasons))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

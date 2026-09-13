@@ -4,7 +4,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 logger = logging.getLogger(__name__)
 
@@ -123,178 +123,251 @@ class VerificationOrchestrator:
         tender_id: Optional[str] = None,
         bid_id: Optional[str] = None,
         company_name_hint: Optional[str] = None,
+        progress_callback: Optional[Callable[[int, str, str, Optional[Dict[str, Any]]], None]] = None,
     ) -> Tuple[AggregatedVerification, VerificationDossier]:
         """
         Executes complete verification pipeline for a tender document and bid documents.
+        Emits truthful stage progress events (Steps 1 through 6) via progress_callback.
         """
-        if self.mode == LLMMode.LIVE and not self.provider.is_available():
-            raise LLMProviderError(
-                "Live verification failed: GEMINI_API_KEY is not configured in environment.",
-                provider_name=self.provider.provider_name,
-                model_name=self.provider.model_name,
+        def notify_progress(step: int, status_str: str, message: str, meta: Optional[Dict[str, Any]] = None):
+            if progress_callback:
+                try:
+                    progress_callback(step, status_str, message, meta)
+                except Exception as cb_err:
+                    logger.warning(f"Progress callback notification error: {cb_err}")
+
+        current_step = 1
+        try:
+            if self.mode == LLMMode.LIVE and not self.provider.is_available():
+                raise LLMProviderError(
+                    "Live verification failed: GEMINI_API_KEY is not configured in environment.",
+                    provider_name=self.provider.provider_name,
+                    model_name=self.provider.model_name,
+                )
+
+            t0 = time.perf_counter()
+
+            # 1. Infer Identifiers if not provided
+            t_base = os.path.basename(tender_document_path)
+            b_base = os.path.basename(bid_document_paths[0]) if bid_document_paths else "BID-UNKNOWN"
+            tender_id = tender_id or (t_base.split(".")[0] if "TENDER" in t_base else "TENDER-0001")
+            bid_id = bid_id or (b_base.split(".")[0] if "BID" in b_base else "BID-00001")
+
+            # --- STEP 1: PDF Ingestion & Page Segmentation ---
+            current_step = 1
+            notify_progress(1, "RUNNING", "Ingesting tender and bidder PDF documents and segmenting pages...")
+
+            t_ingest_res = self.ingestion.ingest_file(tender_document_path)
+            if t_ingest_res.overall_method.value == "FAILED" or len(t_ingest_res.pages) == 0:
+                raise ValueError(f"Invalid or unreadable tender document '{tender_document_path}': {t_ingest_res.errors}")
+
+            bid_ingest_results: List[Tuple[str, Any]] = []
+            for b_path in bid_document_paths:
+                b_ingest_res = self.ingestion.ingest_file(b_path)
+                if b_ingest_res.overall_method.value == "FAILED" or len(b_ingest_res.pages) == 0:
+                    raise ValueError(f"Invalid or unreadable bidder document '{b_path}': {b_ingest_res.errors}")
+                bid_ingest_results.append((b_path, b_ingest_res))
+
+            tender_pages_count = len(t_ingest_res.pages)
+            bid_pages_count = sum(len(res.pages) for _, res in bid_ingest_results)
+            notify_progress(1, "COMPLETED", f"Ingested {tender_pages_count} tender page(s) and {bid_pages_count} bidder page(s).", {
+                "tender_pages": tender_pages_count,
+                "bid_pages": bid_pages_count,
+            })
+
+            # --- STEP 2: Text Extraction & BBox Grounding ---
+            current_step = 2
+            notify_progress(2, "RUNNING", "Grounding spatial bounding boxes and layout geometry...")
+
+            tender_blocks_count = sum(len(p.blocks) for p in t_ingest_res.pages)
+            bid_blocks_count = sum(sum(len(p.blocks) for p in res.pages) for _, res in bid_ingest_results)
+            notify_progress(2, "COMPLETED", f"Spatial bounding boxes and layout geometry indexed ({tender_blocks_count + bid_blocks_count} layout blocks).", {
+                "tender_blocks": tender_blocks_count,
+                "bid_blocks": bid_blocks_count,
+            })
+
+            # --- STEP 3: Candidate Parameter Extraction ---
+            current_step = 3
+            notify_progress(3, "RUNNING", "Extracting compliance requirements and bidder claims...")
+
+            requirements = self.requirement_extractor.extract_requirements(t_ingest_res, tender_id=tender_id)
+
+            all_facts: List[BidderFact] = []
+            grounding_warnings: List[str] = []
+            for b_path, b_ingest_res in bid_ingest_results:
+                facts = self.fact_extractor.extract_facts(b_ingest_res, bid_id=bid_id)
+                all_facts.extend(facts)
+
+            notify_progress(3, "COMPLETED", f"Extracted {len(requirements)} requirement(s) and {len(all_facts)} bidder fact parameter(s).", {
+                "requirements_count": len(requirements),
+                "facts_count": len(all_facts),
+            })
+
+            # --- STEP 4: Deterministic Compliance Evaluation ---
+            current_step = 4
+            notify_progress(4, "RUNNING", "Evaluating deterministic compliance rules against extracted facts...")
+
+            compliance_results = self.rule_engine.verify_bid(requirements, all_facts)
+            pass_eval_count = sum(1 for c in compliance_results if getattr(c.status, "value", str(c.status)) == "PASS")
+            fail_eval_count = sum(1 for c in compliance_results if getattr(c.status, "value", str(c.status)) == "FAIL")
+
+            notify_progress(4, "COMPLETED", f"Evaluated {len(compliance_results)} clauses ({pass_eval_count} PASS, {fail_eval_count} FAIL).", {
+                "evaluated_count": len(compliance_results),
+                "pass_count": pass_eval_count,
+                "fail_count": fail_eval_count,
+            })
+
+            # --- STEP 5: Contradictions & Government Registries ---
+            current_step = 5
+            notify_progress(5, "RUNNING", "Detecting cross-document contradictions and querying government registries...")
+
+            integrity_findings = self.contradiction_engine.detect_contradictions_in_bid(bid_id, all_facts)
+
+            # Extract legal name, GSTIN, PAN, Udyam from facts or hints
+            facts_by_field = {f.field.lower(): f.value for f in all_facts if f.field}
+            facts_by_canonical = {f.canonical_field: f.value for f in all_facts if f.canonical_field}
+            legal_name = company_name_hint or facts_by_field.get("company_name", facts_by_field.get("entity_name")) or facts_by_canonical.get("LEGAL_ENTITY_NAME")
+            gstin_val = facts_by_field.get("gstin") or facts_by_canonical.get("GSTIN")
+            pan_val = facts_by_field.get("pan") or facts_by_canonical.get("PAN")
+            udyam_val = (
+                facts_by_field.get("udyam")
+                or facts_by_field.get("udyam_registration")
+                or facts_by_canonical.get("UDYAM_REGISTRATION")
             )
 
-        t0 = time.perf_counter()
+            # Derive PAN from GSTIN if PAN not submitted directly (chars 3-12 of 15-char GSTIN)
+            if not pan_val and gstin_val and len(str(gstin_val)) == 15:
+                pan_val = str(gstin_val)[2:12]
 
-        # 1. Infer Identifiers if not provided
-        t_base = os.path.basename(tender_document_path)
-        b_base = os.path.basename(bid_document_paths[0]) if bid_document_paths else "BID-UNKNOWN"
-        tender_id = tender_id or (t_base.split(".")[0] if "TENDER" in t_base else "TENDER-0001")
-        bid_id = bid_id or (b_base.split(".")[0] if "BID" in b_base else "BID-00001")
+            gov_responses: List[AdapterResponse] = []
 
-        # 2. Ingestion & Requirement Extraction (Tender)
-        t_ingest_res = self.ingestion.ingest_file(tender_document_path)
-        if t_ingest_res.overall_method.value == "FAILED" or len(t_ingest_res.pages) == 0:
-            raise ValueError(f"Invalid or unreadable tender document '{tender_document_path}': {t_ingest_res.errors}")
+            if gstin_val:
+                gov_responses.append(self.gst_adapter.verify(str(gstin_val), expected_name=str(legal_name) if legal_name else None))
 
-        requirements = self.requirement_extractor.extract_requirements(t_ingest_res, tender_id=tender_id)
+            if pan_val:
+                gov_responses.append(self.pan_adapter.verify(str(pan_val), expected_name=str(legal_name) if legal_name else None))
 
-        # 3. Ingestion & Fact Extraction (Bid Documents)
-        all_facts: List[BidderFact] = []
-        grounding_warnings: List[str] = []
+            if udyam_val:
+                gov_responses.append(self.udyam_adapter.verify(str(udyam_val), expected_name=str(legal_name) if legal_name else None))
 
-        for b_path in bid_document_paths:
-            b_ingest_res = self.ingestion.ingest_file(b_path)
-            if b_ingest_res.overall_method.value == "FAILED" or len(b_ingest_res.pages) == 0:
-                raise ValueError(f"Invalid or unreadable bidder document '{b_path}': {b_ingest_res.errors}")
-            facts = self.fact_extractor.extract_facts(b_ingest_res, bid_id=bid_id)
-            all_facts.extend(facts)
+            # Debarment Check (check PAN, GSTIN, and legal name)
+            debar_val = pan_val or gstin_val or legal_name
+            if debar_val:
+                gov_responses.append(self.debarment_adapter.verify(str(debar_val)))
 
-        # 4. Step 4: Deterministic Compliance Rule Verification
-        compliance_results = self.rule_engine.verify_bid(requirements, all_facts)
+            # Government Registry Verifications (MCA21, NSIC, OEM, MII, ITD)
+            cin_val = facts_by_field.get("cin") or facts_by_canonical.get("CIN") or facts_by_field.get("corporate_id")
+            nsic_val = (
+                facts_by_field.get("nsic")
+                or facts_by_field.get("nsic_certificate")
+                or facts_by_canonical.get("NSIC_REGISTRATION")
+                or facts_by_field.get("nsic_registration")
+            )
+            oem_val = (
+                facts_by_field.get("oem_authorization")
+                or facts_by_field.get("maf")
+                or facts_by_field.get("oem_auth")
+                or facts_by_canonical.get("OEM_AUTHORIZATION")
+                or facts_by_field.get("oem_authorization_number")
+            )
+            mii_val = (
+                facts_by_field.get("mii")
+                or facts_by_field.get("mii_declaration")
+                or facts_by_field.get("local_content")
+                or facts_by_canonical.get("MII_DECLARATION")
+                or facts_by_field.get("mii_certificate")
+            )
+            itr_val = (
+                facts_by_field.get("itr")
+                or facts_by_field.get("itr_ack")
+                or facts_by_field.get("income_tax_return")
+                or facts_by_canonical.get("ITR_ACKNOWLEDGEMENT")
+                or facts_by_field.get("itr_acknowledgement")
+            )
 
-        # 5. Step 5: Cross-Document Contradiction & Integrity Verification
-        integrity_findings = self.contradiction_engine.detect_contradictions_in_bid(bid_id, all_facts)
+            if cin_val:
+                gov_responses.append(self.mca_adapter.verify(str(cin_val), expected_name=str(legal_name) if legal_name else None))
 
-        # 6. Government Registry Verification
-        # Extract legal name, GSTIN, PAN, Udyam from facts or hints
-        facts_by_field = {f.field.lower(): f.value for f in all_facts if f.field}
-        facts_by_canonical = {f.canonical_field: f.value for f in all_facts if f.canonical_field}
-        legal_name = company_name_hint or facts_by_field.get("company_name", facts_by_field.get("entity_name")) or facts_by_canonical.get("LEGAL_ENTITY_NAME")
-        gstin_val = facts_by_field.get("gstin") or facts_by_canonical.get("GSTIN")
-        pan_val = facts_by_field.get("pan") or facts_by_canonical.get("PAN")
-        udyam_val = (
-            facts_by_field.get("udyam")
-            or facts_by_field.get("udyam_registration")
-            or facts_by_canonical.get("UDYAM_REGISTRATION")
-        )
+            if nsic_val:
+                gov_responses.append(self.nsic_adapter.verify(str(nsic_val), expected_name=str(legal_name) if legal_name else None))
 
-        # Derive PAN from GSTIN if PAN not submitted directly (chars 3-12 of 15-char GSTIN)
-        if not pan_val and gstin_val and len(str(gstin_val)) == 15:
-            pan_val = str(gstin_val)[2:12]
+            if oem_val:
+                oem_name_hint = facts_by_field.get("oem_name") or facts_by_canonical.get("OEM_NAME")
+                gov_responses.append(self.oem_adapter.verify(str(oem_val), expected_name=str(legal_name) if legal_name else None, oem_name=str(oem_name_hint) if oem_name_hint else None))
 
-        gov_responses: List[AdapterResponse] = []
+            if mii_val:
+                gov_responses.append(self.mii_adapter.verify(str(mii_val), expected_name=str(legal_name) if legal_name else None))
 
-        if gstin_val:
-            gov_responses.append(self.gst_adapter.verify(str(gstin_val), expected_name=str(legal_name) if legal_name else None))
+            has_itr_req = any(
+                "ITR" in (getattr(r, "requirement_id", "") or "").upper()
+                or "ITR" in (getattr(r, "field", "") or "").upper()
+                or "ITR" in (getattr(r, "canonical_field", "") or "").upper()
+                or "INCOME TAX" in (getattr(r, "description", "") or "").upper()
+                for r in requirements
+            )
+            if itr_val:
+                gov_responses.append(self.itd_adapter.verify(str(itr_val), expected_name=str(legal_name) if legal_name else None))
+            elif has_itr_req and pan_val:
+                gov_responses.append(self.itd_adapter.verify(str(pan_val), expected_name=str(legal_name) if legal_name else None))
 
-        if pan_val:
-            gov_responses.append(self.pan_adapter.verify(str(pan_val), expected_name=str(legal_name) if legal_name else None))
+            notify_progress(5, "COMPLETED", f"Integrity check complete: {len(integrity_findings)} contradiction(s), {len(gov_responses)} registry queries executed.", {
+                "findings_count": len(integrity_findings),
+                "registry_checks_count": len(gov_responses),
+            })
 
-        if udyam_val:
-            gov_responses.append(self.udyam_adapter.verify(str(udyam_val), expected_name=str(legal_name) if legal_name else None))
+            # --- STEP 6: Audit Dossier Compilation & Sealing ---
+            current_step = 6
+            notify_progress(6, "RUNNING", "Aggregating compliance scores and compiling cryptographically sealed audit dossier...")
 
-        # Debarment Check (check PAN, GSTIN, and legal name)
-        debar_val = pan_val or gstin_val or legal_name
-        if debar_val:
-            gov_responses.append(self.debarment_adapter.verify(str(debar_val)))
+            total_time_ms = (time.perf_counter() - t0) * 1000.0
+            extraction_meta = {
+                "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
+                "model": self.provider.model_name,
+                "latency_ms": total_time_ms,
+            }
 
-        # Mock Government Registry Verifications (MCA21, NSIC, OEM, MII, ITD)
-        cin_val = facts_by_field.get("cin") or facts_by_canonical.get("CIN") or facts_by_field.get("corporate_id")
-        nsic_val = (
-            facts_by_field.get("nsic")
-            or facts_by_field.get("nsic_certificate")
-            or facts_by_canonical.get("NSIC_REGISTRATION")
-            or facts_by_field.get("nsic_registration")
-        )
-        oem_val = (
-            facts_by_field.get("oem_authorization")
-            or facts_by_field.get("maf")
-            or facts_by_field.get("oem_auth")
-            or facts_by_canonical.get("OEM_AUTHORIZATION")
-            or facts_by_field.get("oem_authorization_number")
-        )
-        mii_val = (
-            facts_by_field.get("mii")
-            or facts_by_field.get("mii_declaration")
-            or facts_by_field.get("local_content")
-            or facts_by_canonical.get("MII_DECLARATION")
-            or facts_by_field.get("mii_certificate")
-        )
-        itr_val = (
-            facts_by_field.get("itr")
-            or facts_by_field.get("itr_ack")
-            or facts_by_field.get("income_tax_return")
-            or facts_by_canonical.get("ITR_ACKNOWLEDGEMENT")
-            or facts_by_field.get("itr_acknowledgement")
-        )
+            aggregated = self.aggregator.aggregate(
+                tender_id=tender_id,
+                bid_id=bid_id,
+                compliance_results=compliance_results,
+                integrity_findings=integrity_findings,
+                government_responses=gov_responses,
+                grounding_warnings=grounding_warnings,
+                extraction_metadata=extraction_meta,
+                requirements=requirements,
+                facts=all_facts,
+            )
 
-        if cin_val:
-            gov_responses.append(self.mca_adapter.verify(str(cin_val), expected_name=str(legal_name) if legal_name else None))
+            dossier = self._generate_dossier(
+                tender_id=tender_id,
+                bid_id=bid_id,
+                legal_name=legal_name,
+                requirements=requirements,
+                facts=all_facts,
+                compliance_results=compliance_results,
+                integrity_findings=integrity_findings,
+                aggregated=aggregated,
+                total_time_ms=total_time_ms,
+            )
 
-        if nsic_val:
-            gov_responses.append(self.nsic_adapter.verify(str(nsic_val), expected_name=str(legal_name) if legal_name else None))
+            # Cache results
+            self._verifications[aggregated.verification_id] = aggregated
+            self._dossiers[aggregated.verification_id] = dossier
 
-        if oem_val:
-            oem_name_hint = facts_by_field.get("oem_name") or facts_by_canonical.get("OEM_NAME")
-            gov_responses.append(self.oem_adapter.verify(str(oem_val), expected_name=str(legal_name) if legal_name else None, oem_name=str(oem_name_hint) if oem_name_hint else None))
+            # Save to disk cache
+            self._save_to_disk(aggregated, dossier)
 
-        if mii_val:
-            gov_responses.append(self.mii_adapter.verify(str(mii_val), expected_name=str(legal_name) if legal_name else None))
+            notify_progress(6, "COMPLETED", f"Audit dossier sealed (ID: {aggregated.verification_id}). Verification complete.", {
+                "verification_id": aggregated.verification_id,
+                "overall_status": aggregated.overall_status,
+                "compliance_score": aggregated.compliance_score,
+            })
 
-        has_itr_req = any(
-            "ITR" in (getattr(r, "requirement_id", "") or "").upper()
-            or "ITR" in (getattr(r, "field", "") or "").upper()
-            or "ITR" in (getattr(r, "canonical_field", "") or "").upper()
-            or "INCOME TAX" in (getattr(r, "description", "") or "").upper()
-            for r in requirements
-        )
-        if itr_val:
-            gov_responses.append(self.itd_adapter.verify(str(itr_val), expected_name=str(legal_name) if legal_name else None))
-        elif has_itr_req and pan_val:
-            gov_responses.append(self.itd_adapter.verify(str(pan_val), expected_name=str(legal_name) if legal_name else None))
+            return aggregated, dossier
 
-        # 7. Aggregation & Decision Logic
-        total_time_ms = (time.perf_counter() - t0) * 1000.0
-        extraction_meta = {
-            "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
-            "model": self.provider.model_name,
-            "latency_ms": total_time_ms,
-        }
-
-        aggregated = self.aggregator.aggregate(
-            tender_id=tender_id,
-            bid_id=bid_id,
-            compliance_results=compliance_results,
-            integrity_findings=integrity_findings,
-            government_responses=gov_responses,
-            grounding_warnings=grounding_warnings,
-            extraction_metadata=extraction_meta,
-            requirements=requirements,
-            facts=all_facts,
-        )
-
-        # 8. Compile Verification Dossier
-        dossier = self._generate_dossier(
-            tender_id=tender_id,
-            bid_id=bid_id,
-            legal_name=legal_name,
-            requirements=requirements,
-            facts=all_facts,
-            compliance_results=compliance_results,
-            integrity_findings=integrity_findings,
-            aggregated=aggregated,
-            total_time_ms=total_time_ms,
-        )
-
-        # Cache results
-        self._verifications[aggregated.verification_id] = aggregated
-        self._dossiers[aggregated.verification_id] = dossier
-
-        # Save to disk cache
-        self._save_to_disk(aggregated, dossier)
-
-        return aggregated, dossier
+        except Exception as exc:
+            notify_progress(current_step, "FAILED", f"Stage {current_step} failed: {str(exc)}")
+            raise
 
     def get_verification(self, verification_id: str) -> Optional[AggregatedVerification]:
         if verification_id in self._verifications:

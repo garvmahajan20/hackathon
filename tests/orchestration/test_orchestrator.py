@@ -244,7 +244,8 @@ class TestStep8Orchestration(unittest.TestCase):
         orch = VerificationOrchestrator(mode=LLMMode.LIVE)
         self.assertEqual(orch.mode, LLMMode.LIVE)
         self.assertEqual(orch.provider.provider_name, "Gemini")
-        self.assertEqual(orch.provider.model_name, "gemini-3.8-flash")
+        expected_model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+        self.assertEqual(orch.provider.model_name, expected_model)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

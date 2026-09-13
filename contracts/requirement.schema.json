@@ -242,6 +242,20 @@
         "resolution_status"
       ],
       "additionalProperties": true
+    },
+    "requirement_type": {
+      "type": "string",
+      "description": "Classification of requirement obligation.",
+      "enum": [
+        "BIDDER_COMPLIANCE",
+        "PROCESS_CONDITION",
+        "GENERAL_POLICY",
+        "INFORMATIONAL",
+        "COMMERCIAL_TERMS",
+        "DELIVERY_LOGISTICS",
+        "BIDDER_OBLIGATION"
+      ],
+      "default": "BIDDER_COMPLIANCE"
     }
   },
   "additionalProperties": false
