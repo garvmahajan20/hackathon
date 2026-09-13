@@ -1,8 +1,21 @@
-# -*- coding: utf-8 -*-
+import hashlib
 import json
+import logging
 import os
+import re
 import time
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger(__name__)
+
+def _get_cache_filename(verification_id: str) -> str:
+    """
+    Deterministic, filesystem-safe filename for verification persistence.
+    Replaces illegal Windows characters (including '/') with '_' and appends a sha256 hash.
+    """
+    safe_slug = re.sub(r'[^a-zA-Z0-9_\-]', '_', verification_id)[:64]
+    h = hashlib.sha256(verification_id.encode('utf-8')).hexdigest()[:12]
+    return f"{safe_slug}_{h}.json"
 
 from backend.core.contradiction_engine import CrossDocumentContradictionEngine
 from backend.core.models import BidderFact, TenderRequirement, VerificationResult
@@ -11,7 +24,7 @@ from backend.extraction.cache import LLMCache
 from backend.extraction.fact_extractor import LLMBidderFactExtractor
 from backend.extraction.gemini_provider import GeminiProvider
 from backend.extraction.mock_provider import MockLLMProvider
-from backend.extraction.models import LLMMode
+from backend.extraction.models import LLMMode, LLMProviderError
 from backend.extraction.provider import BaseLLMProvider
 from backend.extraction.requirement_extractor import TenderRequirementExtractor
 from backend.extraction.schema_validator import SchemaValidator
@@ -41,7 +54,7 @@ class VerificationOrchestrator:
 
     def __init__(
         self,
-        mode: Union[LLMMode, str] = LLMMode.MOCK,
+        mode: Union[LLMMode, str] = LLMMode.LIVE,
         provider: Optional[BaseLLMProvider] = None,
         cache_dir: str = "data/cache/verifications",
         llm_cache_dir: str = "data/cache/llm",
@@ -114,6 +127,13 @@ class VerificationOrchestrator:
         """
         Executes complete verification pipeline for a tender document and bid documents.
         """
+        if self.mode == LLMMode.LIVE and not self.provider.is_available():
+            raise LLMProviderError(
+                "Live verification failed: GEMINI_API_KEY is not configured in environment.",
+                provider_name=self.provider.provider_name,
+                model_name=self.provider.model_name,
+            )
+
         t0 = time.perf_counter()
 
         # 1. Infer Identifiers if not provided
@@ -127,7 +147,7 @@ class VerificationOrchestrator:
         if t_ingest_res.overall_method.value == "FAILED" or len(t_ingest_res.pages) == 0:
             raise ValueError(f"Invalid or unreadable tender document '{tender_document_path}': {t_ingest_res.errors}")
 
-        requirements = self.requirement_extractor.extract_requirements(t_ingest_res)
+        requirements = self.requirement_extractor.extract_requirements(t_ingest_res, tender_id=tender_id)
 
         # 3. Ingestion & Fact Extraction (Bid Documents)
         all_facts: List[BidderFact] = []
@@ -390,30 +410,113 @@ class VerificationOrchestrator:
         )
 
     def _save_to_disk(self, aggregated: AggregatedVerification, dossier: VerificationDossier) -> None:
+        filename = _get_cache_filename(aggregated.verification_id)
+        verif_file = os.path.join(self.cache_dir, filename)
         try:
-            verif_file = os.path.join(self.cache_dir, f"{aggregated.verification_id}.json")
             with open(verif_file, "w", encoding="utf-8") as f:
                 json.dump({
                     "verification": aggregated.to_dict(),
                     "dossier": dossier.to_dict()
                 }, f, indent=2)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.error(f"Failed to persist verification '{aggregated.verification_id}' to {verif_file}: {e}")
+            raise IOError(f"Failed to persist verification to disk: {e}") from e
+
+    def list_verifications(self) -> List[AggregatedVerification]:
+        """
+        Lists all cached verifications from in-memory store and disk cache.
+        Scans cache_dir and loads any verification file not yet present in memory.
+        Returns all verifications sorted by generated_at descending (newest first).
+        """
+        if os.path.exists(self.cache_dir):
+            try:
+                for fname in os.listdir(self.cache_dir):
+                    if not fname.endswith(".json"):
+                        continue
+                    filepath = os.path.join(self.cache_dir, fname)
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            data = json.load(f)
+                        if "verification" in data and "dossier" in data:
+                            verif = AggregatedVerification.from_dict(data["verification"])
+                            dossier = VerificationDossier.from_dict(data["dossier"])
+                            vid = verif.verification_id
+                            if vid not in self._verifications:
+                                self._verifications[vid] = verif
+                                self._dossiers[vid] = dossier
+                    except Exception as e:
+                        logger.debug(f"Skipping unparseable verification file '{fname}': {e}")
+            except Exception as e:
+                logger.error(f"Error scanning cache directory '{self.cache_dir}': {e}")
+
+        verifs = list(self._verifications.values())
+        verifs.sort(key=lambda v: getattr(v, "generated_at", "") or "", reverse=True)
+        return verifs
+
+    def get_all_review_items(self) -> List[Dict[str, Any]]:
+        """
+        Retrieves human review items across all persisted verifications.
+        Enriches review items with verification identifiers and timestamps.
+        Returns items sorted by created_at descending (newest first).
+        """
+        all_verifs = self.list_verifications()
+        all_items: List[Dict[str, Any]] = []
+        for v in all_verifs:
+            for item in getattr(v, "human_review_items", []):
+                item_dict = item.to_dict() if hasattr(item, "to_dict") else dict(item)
+                if not item_dict.get("bid_id"):
+                    item_dict["bid_id"] = v.bid_id
+                if not item_dict.get("tender_id"):
+                    item_dict["tender_id"] = v.tender_id
+                if not item_dict.get("verification_id"):
+                    item_dict["verification_id"] = v.verification_id
+                if not item_dict.get("source_documents"):
+                    item_dict["source_documents"] = [f"{v.bid_id}.pdf"]
+                if not item_dict.get("created_at"):
+                    item_dict["created_at"] = getattr(v, "generated_at", "")
+                all_items.append(item_dict)
+
+        all_items.sort(key=lambda x: x.get("created_at", "") or "", reverse=True)
+        return all_items
 
     def _load_from_disk(self, verification_id: str) -> Optional[AggregatedVerification]:
+        filename = _get_cache_filename(verification_id)
+        verif_file = os.path.join(self.cache_dir, filename)
+        if not os.path.exists(verif_file):
+            # Legacy fallback: check if file was saved under raw verification_id
+            legacy_file = os.path.join(self.cache_dir, f"{verification_id}.json")
+            if os.path.exists(legacy_file):
+                verif_file = legacy_file
+            else:
+                # Direct scan of cache_dir to locate file by internal verification_id
+                if os.path.exists(self.cache_dir):
+                    for fn in os.listdir(self.cache_dir):
+                        if fn.endswith(".json"):
+                            try:
+                                fp = os.path.join(self.cache_dir, fn)
+                                with open(fp, "r", encoding="utf-8") as f:
+                                    data = json.load(f)
+                                if data.get("verification", {}).get("verification_id") == verification_id:
+                                    verif = AggregatedVerification.from_dict(data["verification"])
+                                    dossier = VerificationDossier.from_dict(data["dossier"])
+                                    self._verifications[verification_id] = verif
+                                    self._dossiers[verification_id] = dossier
+                                    return verif
+                            except Exception:
+                                pass
+                return None
+
         try:
-            verif_file = os.path.join(self.cache_dir, f"{verification_id}.json")
-            if os.path.exists(verif_file):
-                with open(verif_file, "r", encoding="utf-8") as f:
-                    data = json.load(f)
-                verif = AggregatedVerification.from_dict(data["verification"])
-                dossier = VerificationDossier.from_dict(data["dossier"])
-                self._verifications[verification_id] = verif
-                self._dossiers[verification_id] = dossier
-                return verif
-        except Exception:
-            pass
-        return None
+            with open(verif_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            verif = AggregatedVerification.from_dict(data["verification"])
+            dossier = VerificationDossier.from_dict(data["dossier"])
+            self._verifications[verification_id] = verif
+            self._dossiers[verification_id] = dossier
+            return verif
+        except Exception as e:
+            logger.error(f"Failed to load verification '{verification_id}' from disk cache: {e}")
+            return None
 
     def adjudicate(
         self,

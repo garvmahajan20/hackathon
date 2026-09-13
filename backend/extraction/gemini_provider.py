@@ -34,8 +34,9 @@ class GeminiProvider(BaseLLMProvider):
         else:
             self._api_key = api_key
 
-        self._model_name = (model_name or os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")).strip()
-        self._fallback_model = (fallback_model or os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.7-flash")).strip()
+        self._model_name = (model_name or os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")).strip()
+        self._fallback_model = (fallback_model or os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash")).strip()
+        self._fallback_models = [m for m in [self._fallback_model, "gemini-3.5-flash", "gemini-3.1-flash-lite"] if m and m != self._model_name]
         self._max_retries = max_retries
         self._timeout = timeout_seconds
 
@@ -94,8 +95,8 @@ class GeminiProvider(BaseLLMProvider):
                     )
                 else:
                     last_error = f"Gemini API error ({resp.status_code}): {resp.text}"
-                    # Return immediately on 404 (model not found) to allow fallback without burning retries
-                    if resp.status_code == 404:
+                    # Return immediately on 404 or daily quota exhaustion to allow fallback without burning retries
+                    if resp.status_code == 404 or (resp.status_code == 429 and "quota" in resp.text.lower()):
                         return LLMProviderResponse(
                             content="",
                             model_name=model,
@@ -160,12 +161,13 @@ class GeminiProvider(BaseLLMProvider):
         if not res.error:
             return res
 
-        # 2. Bounded Single Fallback (only on model availability errors: 404 or 503)
-        if self._fallback_model and self._fallback_model != self._model_name:
-            err_str = res.error or ""
-            if "404" in err_str or "503" in err_str or "NOT_FOUND" in err_str or "UNAVAILABLE" in err_str:
-                fallback_res = self._execute_request(self._fallback_model, payload)
-                if not fallback_res.error:
-                    return fallback_res
+        # 2. Resilient Fallback Cascade (on 404, 503, or 429 quota exhaustion)
+        err_str = res.error or ""
+        if any(code in err_str for code in ["404", "503", "429", "NOT_FOUND", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "quota"]):
+            for fallback_m in getattr(self, "_fallback_models", [self._fallback_model]):
+                if fallback_m and fallback_m != self._model_name:
+                    fallback_res = self._execute_request(fallback_m, payload)
+                    if not fallback_res.error:
+                        return fallback_res
 
         return res

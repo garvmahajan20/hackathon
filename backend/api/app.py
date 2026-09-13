@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import load_dotenv
-from backend.extraction.models import LLMMode
+from backend.extraction.models import LLMMode, LLMProviderError
 from backend.orchestration import VerificationOrchestrator
 from .schemas import (
     AggregatedVerificationResponse,
@@ -70,16 +70,17 @@ app.include_router(gst_router)
 from .mock_registry_router import router as mock_registry_router
 app.include_router(mock_registry_router)
 
-# Global Orchestrator Instances (cached/mock by default to conserve quota)
-_orchestrator = VerificationOrchestrator(mode=LLMMode.MOCK)
+# Global Orchestrator Instances (singleton per mode, defaults to LIVE for production)
+_orchestrators = {}
 
-def get_orchestrator(mode_str: str = "mock") -> VerificationOrchestrator:
-    mode_upper = mode_str.upper()
-    if mode_upper == "LIVE":
-        return VerificationOrchestrator(mode=LLMMode.LIVE)
-    elif mode_upper == "CACHED":
-        return VerificationOrchestrator(mode=LLMMode.CACHED)
-    return _orchestrator
+def get_orchestrator(mode_str: Optional[str] = None) -> VerificationOrchestrator:
+    effective_mode = (mode_str or os.environ.get("VERIFICATION_MODE", "LIVE")).upper().strip()
+    if effective_mode not in _orchestrators:
+        llm_mode = LLMMode(effective_mode)
+        _orchestrators[effective_mode] = VerificationOrchestrator(mode=llm_mode)
+    return _orchestrators[effective_mode]
+
+_orchestrator = get_orchestrator("LIVE")
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
@@ -98,12 +99,13 @@ async def generic_exception_handler(request, exc: Exception):
 
 @app.get("/health", response_model=HealthResponse)
 async def health_check():
-    active_model = os.environ.get("GEMINI_MODEL", "gemini-3.8-flash")
+    live_orch = get_orchestrator("LIVE")
+    active_model = live_orch.provider.model_name
     return HealthResponse(
         status="HEALTHY",
         version="1.0.0",
         active_model=active_model,
-        mode=_orchestrator.mode.value if hasattr(_orchestrator.mode, 'value') else str(_orchestrator.mode),
+        mode=live_orch.mode.value if hasattr(live_orch.mode, 'value') else str(live_orch.mode),
     )
 
 def _validate_and_save_file(upload_file: UploadFile, target_dir: str) -> str:
@@ -153,6 +155,7 @@ def _validate_and_save_file(upload_file: UploadFile, target_dir: str) -> str:
     responses={
         400: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
     }
 )
 async def verify_bid(
@@ -161,7 +164,7 @@ async def verify_bid(
     tender_id: Optional[str] = Form(None),
     bid_id: Optional[str] = Form(None),
     company_name: Optional[str] = Form(None),
-    mode: Optional[str] = Form("mock"),
+    mode: Optional[str] = Form("live"),
 ):
     """
     End-to-End Bid Verification Endpoint.
@@ -186,8 +189,8 @@ async def verify_bid(
             b_path = _validate_and_save_file(bf, temp_dir)
             bid_paths.append(b_path)
 
-        # Get orchestrator for requested mode (defaults to MOCK to conserve quota)
-        orch = get_orchestrator(mode or "mock")
+        # Get orchestrator for requested mode (defaults to LIVE for real verification)
+        orch = get_orchestrator(mode or "live")
 
         # Execute end-to-end verification
         try:
@@ -197,6 +200,11 @@ async def verify_bid(
                 tender_id=tender_id,
                 bid_id=bid_id,
                 company_name_hint=company_name,
+            )
+        except LLMProviderError as lpe:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Live verification provider failure: {str(lpe)}",
             )
         except ValueError as ve:
             raise HTTPException(
@@ -212,6 +220,27 @@ async def verify_bid(
             shutil.rmtree(temp_dir)
         except Exception:
             pass
+
+@app.get(
+    "/api/v1/verifications",
+    response_model=List[AggregatedVerificationResponse],
+)
+async def list_all_verifications():
+    """
+    Retrieves all persisted verifications across disk cache and memory, sorted newest first.
+    """
+    verifs = _orchestrator.list_verifications()
+    return [v.to_dict() for v in verifs]
+
+@app.get(
+    "/api/v1/review-queue",
+    response_model=List[HumanReviewItemResponse],
+)
+async def get_all_review_queue_items():
+    """
+    Retrieves human review items across all persisted verifications, sorted newest first.
+    """
+    return _orchestrator.get_all_review_items()
 
 @app.get(
     "/api/v1/verification/{verification_id}",

@@ -46,10 +46,11 @@ class VerificationAggregator:
         grounding_warnings = grounding_warnings or []
         extraction_metadata = extraction_metadata or {}
 
-        # 1. Deterministic Run Identifier
         seed_str = f"{tender_id}:{bid_id}:{len(compliance_results)}:{len(integrity_findings)}:{len(government_responses)}"
         deterministic_run_id = f"RUN-{hashlib.sha256(seed_str.encode('utf-8')).hexdigest()[:12].upper()}"
-        verification_id = f"VERIF-{tender_id}-{bid_id}"
+        safe_tender = str(tender_id).replace("/", "_").replace("\\", "_")
+        safe_bid = str(bid_id).replace("/", "_").replace("\\", "_")
+        verification_id = f"VERIF-{safe_tender}-{safe_bid}"
 
         # 2. Compliance Evaluation
         critical_fails = 0
@@ -57,6 +58,7 @@ class VerificationAggregator:
         missing_count = 0
         review_count = 0
         pass_count = 0
+        na_count = 0
         total_compliance = len(compliance_results)
 
         human_review_items: List[HumanReviewItem] = []
@@ -81,6 +83,8 @@ class VerificationAggregator:
                 review_count += 1
             elif r.status in ("PASS", "OVERRIDDEN_PASS"):
                 pass_count += 1
+            elif r.status == "N_A":
+                na_count += 1
 
             # Route compliance items requiring review (unless already adjudicated)
             has_officer_override = bool(r.officer_override and r.officer_override.get("decision"))
@@ -97,17 +101,21 @@ class VerificationAggregator:
                     evidence_references=[e.to_dict() if hasattr(e, 'to_dict') else e for e in r.evidence],
                     source_documents=list(set([e.document if hasattr(e, 'document') else e.get('document', '') for e in r.evidence if e])),
                     source_pages=list(set([e.page if hasattr(e, 'page') else e.get('page', 1) for e in r.evidence if e])),
+                    verification_id=verification_id,
                     related_verification_id=r.verification_id,
                 ))
 
         # Determine Compliance Status
+        effective_compliance = total_compliance - na_count
         if critical_fails > 0 or major_fails > 0:
             compliance_status = ComplianceStatus.FAIL.value
         elif missing_count > 0:
             compliance_status = ComplianceStatus.MISSING.value
         elif review_count > 0:
             compliance_status = ComplianceStatus.REVIEW.value
-        elif pass_count == total_compliance and total_compliance > 0:
+        elif pass_count == effective_compliance and effective_compliance > 0:
+            compliance_status = ComplianceStatus.PASS.value
+        elif effective_compliance == 0:
             compliance_status = ComplianceStatus.PASS.value
         else:
             compliance_status = ComplianceStatus.REVIEW.value if total_compliance == 0 else ComplianceStatus.PARTIAL.value
@@ -138,6 +146,7 @@ class VerificationAggregator:
                     evidence_references=[finding.evidence_a, finding.evidence_b],
                     source_documents=[finding.evidence_a.get("document", ""), finding.evidence_b.get("document", "")],
                     source_pages=[finding.evidence_a.get("page", 1), finding.evidence_b.get("page", 1)],
+                    verification_id=verification_id,
                     related_verification_id=finding.finding_id,
                 ))
 
@@ -176,6 +185,7 @@ class VerificationAggregator:
                         evidence_references=[resp_data],
                         source_documents=["GOVERNMENT_DEBARMENT_REGISTRY"],
                         source_pages=[1],
+                        verification_id=verification_id,
                         related_verification_id=gov_resp.adapter_name,
                     ))
 
@@ -192,6 +202,7 @@ class VerificationAggregator:
                     evidence_references=[resp_data],
                     source_documents=[gov_resp.adapter_name],
                     source_pages=[1],
+                    verification_id=verification_id,
                     related_verification_id=gov_resp.adapter_name,
                 ))
 
@@ -208,6 +219,7 @@ class VerificationAggregator:
                 evidence_references=[],
                 source_documents=[],
                 source_pages=[],
+                verification_id=verification_id,
             ))
 
         # 6. Overall Status Determination (Phase 4 Rules)

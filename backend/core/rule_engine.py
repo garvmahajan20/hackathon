@@ -67,8 +67,14 @@ class DeterministicRuleEngine:
             if f.bid_id:
                 bid_id = f.bid_id
             facts_by_field[f.field.lower()].append(f)
-            if f.canonical_field:
-                facts_by_canonical[f.canonical_field.lower()].append(f)
+            canon = f.canonical_field
+            if not canon:
+                from .ontology import resolve_field
+                c_res = resolve_field(f.field)
+                if c_res.resolution_status == "RESOLVED":
+                    canon = c_res.canonical_field_id
+            if canon:
+                facts_by_canonical[canon.lower()].append(f)
 
         # Index bidder profile for statutory exemptions
         is_mse = self._check_exemption_status(facts_by_field, ["is_mse", "mse_registered", "udyam_registration"])
@@ -104,6 +110,35 @@ class DeterministicRuleEngine:
                 )
                 continue
 
+            # 3A1. Check if non-bidder requirement type (Process condition, general policy, or informational)
+            req_type = getattr(req, "requirement_type", None)
+            if not req_type and req.applicability and isinstance(req.applicability, dict):
+                req_type = req.applicability.get("requirement_type")
+            req_type = str(req_type).upper() if req_type else "BIDDER_COMPLIANCE"
+
+            if req_type in ("PROCESS_CONDITION", "INFORMATIONAL", "GENERAL_POLICY"):
+                results.append(
+                    VerificationResult(
+                        verification_id=verif_id,
+                        requirement_id=req.requirement_id,
+                        bid_id=bid_id,
+                        status=ComplianceStatus.N_A.value,
+                        severity=Severity.INFO.value,
+                        expected=f"{req.operator} {req.expected_value} {req.unit or ''}".strip(),
+                        actual=f"N/A ({req_type.replace('_', ' ').title()})",
+                        operator_used=req.operator,
+                        reason=f"Tender {req_type.lower().replace('_', ' ')} (not a bidder submission obligation).",
+                        requires_human_review=False,
+                        evidence=req.evidence or [],
+                        precedence_chain={
+                            "status": "PROCESS_CONDITION" if req_type == "PROCESS_CONDITION" else req_type,
+                            "source_type": req.source_type,
+                            "source_priority": req.source_priority,
+                        }
+                    )
+                )
+                continue
+
             # 3B. Check Conditional Exemptions
             exemption_result = self._evaluate_conditional_exemption(req, is_mse, is_startup, bid_id, verif_id, facts_by_field)
             if exemption_result is not None:
@@ -126,6 +161,29 @@ class DeterministicRuleEngine:
                     matching_facts = facts_by_canonical.get(req_canonical.lower(), [])
 
             if not matching_facts:
+                if req_type not in ("BIDDER_COMPLIANCE", "BIDDER_OBLIGATION"):
+                    results.append(
+                        VerificationResult(
+                            verification_id=verif_id,
+                            requirement_id=req.requirement_id,
+                            bid_id=bid_id,
+                            status=ComplianceStatus.N_A.value,
+                            severity=Severity.INFO.value,
+                            expected=f"{req.operator} {req.expected_value} {req.unit or ''}".strip(),
+                            actual=f"N/A ({req_type.replace('_', ' ').title()})",
+                            operator_used=req.operator,
+                            reason=f"Tender condition '{req.field or req.description}' (not a bidder submission obligation).",
+                            requires_human_review=False,
+                            evidence=req.evidence or [],
+                            precedence_chain={
+                                "status": req_type,
+                                "source_type": req.source_type,
+                                "source_priority": req.source_priority,
+                            }
+                        )
+                    )
+                    continue
+
                 # No fact submitted
                 if req.operator == OperatorType.EXISTS.value:
                     status = ComplianceStatus.MISSING.value
@@ -162,6 +220,15 @@ class DeterministicRuleEngine:
             fact = matching_facts[0]
             actual_val = fact.normalized_value if fact.normalized_value is not None else fact.value
             expected_val = req.normalized_expected_value if req.normalized_expected_value is not None else req.expected_value
+
+            # If canonical field is DELIVERY_PERIOD or unit is DAYS, ensure duration normalization
+            if req.canonical_field == "DELIVERY_PERIOD" or req.unit == "DAYS" or getattr(fact, "canonical_field", "") == "DELIVERY_PERIOD":
+                exp_dur, _ = normalize_duration(req.expected_value, target_unit="DAYS")
+                if exp_dur is not None:
+                    expected_val = int(exp_dur)
+                act_dur, _ = normalize_duration(actual_val, target_unit="DAYS")
+                if act_dur is not None:
+                    actual_val = int(act_dur)
 
             # If operator is VALID_ON, pass reference date as expected
             if req.operator == OperatorType.VALID_ON.value:

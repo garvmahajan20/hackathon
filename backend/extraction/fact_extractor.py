@@ -13,7 +13,7 @@ from backend.ingestion.fact_extractor_interface import BaseFactExtractor
 from backend.ingestion.models import ExtractionResult
 from .cache import LLMCache
 from .evidence_grounder import EvidenceGrounder
-from .models import CandidateFact, ExtractionStatus, LLMMode
+from .models import CandidateFact, ExtractionStatus, LLMMode, LLMProviderError
 from .prompts import (
     BIDDER_FACT_SYSTEM_PROMPT,
     FACT_PROMPT_VERSION,
@@ -74,6 +74,13 @@ class LLMBidderFactExtractor(BaseFactExtractor):
                 system_prompt=BIDDER_FACT_SYSTEM_PROMPT,
             )
             if resp.error:
+                if self.mode == LLMMode.LIVE:
+                    raise LLMProviderError(
+                        f"Bidder fact extraction failed via {self.provider.provider_name} ({self.provider.model_name}): {resp.error}",
+                        provider_name=self.provider.provider_name,
+                        model_name=self.provider.model_name,
+                        error_detail=resp.error,
+                    )
                 return []
             response_text = resp.content
             if self.mode == LLMMode.LIVE and not resp.is_mock:

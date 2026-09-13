@@ -19,6 +19,7 @@ interface DocumentCanvasProps {
   textBlocks: PhysicalTextBlock[];
   selectedClauseId: string | null;
   selectedBlockId?: string | null;
+  activePage?: number;
   onSelectClause: (clauseId: string) => void;
   onSelectBlock?: (blockId: string) => void;
   onHoverEvidence: (evidence: EvidenceData | null, pos?: { x: number; y: number }) => void;
@@ -30,6 +31,7 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = ({
   textBlocks,
   selectedClauseId,
   selectedBlockId,
+  activePage,
   onSelectClause,
   onSelectBlock,
   onHoverEvidence,
@@ -37,17 +39,21 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = ({
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [zoomLevel, setZoomLevel] = useState<number>(95);
 
-  const totalPages = Math.max(1, ...textBlocks.map((b) => b.page));
+  const totalPages = Math.max(1, ...textBlocks.map((b) => b.page), activePage || 1);
 
-  // Automatically switch page when active clause or evidence block changes
+  // Automatically switch page when active clause, evidence block, or activePage changes
   useEffect(() => {
+    if (activePage && activePage >= 1) {
+      setCurrentPage(activePage);
+      return;
+    }
     if (textBlocks.length > 0) {
       const match = selectedBlockId
         ? textBlocks.find((b) => b.id === selectedBlockId)
         : selectedClauseId
         ? textBlocks.find((b) => {
             const cid = b.clause_id || (b as any).matched_clause_id;
-            return cid === selectedClauseId || (cid && selectedClauseId.includes(cid));
+            return cid === selectedClauseId;
           })
         : undefined;
 
@@ -55,7 +61,7 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = ({
         setCurrentPage(match.page);
       }
     }
-  }, [selectedClauseId, selectedBlockId, textBlocks]);
+  }, [activePage, selectedClauseId, selectedBlockId, textBlocks]);
 
   const pageBlocks = textBlocks.filter((b) => b.page === currentPage);
 
@@ -215,9 +221,11 @@ export const DocumentCanvas: React.FC<DocumentCanvasProps> = ({
                           </span>
                           <span className="text-slate-500">({block.id})</span>
                         </div>
-                        <span className="text-[9px] text-slate-500 font-mono">
-                          [{block.bbox.map((n) => Math.round(n)).join(", ")}]
-                        </span>
+                        {block.bbox && block.bbox.some((c) => c > 0) ? (
+                          <span className="text-[9px] text-slate-500 font-mono">
+                            [{block.bbox.map((n) => Math.round(n)).join(", ")}]
+                          </span>
+                        ) : null}
                       </div>
                     )}
 

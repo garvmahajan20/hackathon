@@ -1,0 +1,553 @@
+{
+  "test_run": "TEST_C_REAL_WORLD_BIDDER_FORENSICS",
+  "timestamp": "2026-09-09T23:50:00+05:30",
+  "execution_time_seconds": 0.4,
+  "corpus_inventory": {
+    "total_candidates_discovered": 8,
+    "qualified_real_world_documents": 5,
+    "rejected_candidates": 3,
+    "bidders": [
+      "Indian Institute of Information Technology Ranchi",
+      "REL Services",
+      "A R Systems",
+      "Bothra Shipping Services Pvt. Ltd.",
+      "E F Y Enterprises Private Limited"
+    ],
+    "tenders": [
+      "STATUTORY_VENDOR_ENLISTMENT",
+      "MSME_PREFERENCE_ENLISTMENT",
+      "DMRC_RAIL_ELECTRIFICATION_WORK",
+      "NSIC/PMV/2023-24/TAILOR/01(R4)"
+    ],
+    "document_types": [
+      "EXPERIENCE_CERTIFICATE",
+      "GST_CERTIFICATE",
+      "COURT_RECORD",
+      "UDYAM_CERTIFICATE"
+    ]
+  },
+  "aggregate_metrics": {
+    "total_documents_discovered": 8,
+    "qualified_documents": 5,
+    "rejected_candidates": 3,
+    "ingestion_success_rate": 1.0,
+    "total_pages_processed": 30,
+    "requirements_evaluated": 5,
+    "bidder_facts_extracted": 5,
+    "grounded_facts": 5,
+    "ungrounded_positive_facts": 0,
+    "unsupported_facts": 0,
+    "false_passes": 0,
+    "false_fails": 0,
+    "contradiction_count": 1,
+    "integrity_findings_count": 1,
+    "unknown_review_count": 1,
+    "replay_consistency_rate": 1.0,
+    "api_real_available_count": 0,
+    "api_unavailable_recorded_count": 3,
+    "total_review_items_generated": 6,
+    "review_items": [
+      {
+        "review_id": "REV-Bothra-001",
+        "bidder": "Bothra Shipping Services Pvt. Ltd.",
+        "category": "MISSING_EVIDENCE",
+        "reason": "RFP Clause 4.4 and Annexure V mandatory Work Completion Certificate / LoA missing."
+      },
+      {
+        "review_id": "REV-Bothra-002",
+        "bidder": "Bothra Shipping Services Pvt. Ltd.",
+        "category": "INTEGRITY_CONTRADICTION",
+        "reason": "CA certificate tendered in place of mandatory Work Completion Certificate."
+      },
+      {
+        "review_id": "REV-IIIT-001",
+        "bidder": "Indian Institute of Information Technology Ranchi",
+        "category": "GOVERNMENT_MISMATCH",
+        "reason": "GSTIN 20AAAAI9928G1ZT requires live portal confirmation due to test API unavailability."
+      },
+      {
+        "review_id": "REV-EFY-001",
+        "bidder": "E F Y Enterprises Private Limited",
+        "category": "GOVERNMENT_MISMATCH",
+        "reason": "GSTIN 27AAACE0598E1ZR requires live portal confirmation due to test API unavailability."
+      },
+      {
+        "review_id": "REV-AR-001",
+        "bidder": "A R Systems",
+        "category": "GOVERNMENT_MISMATCH",
+        "reason": "Udyam UDYAM-UK-06-0000525 requires live portal confirmation due to test API unavailability."
+      },
+      {
+        "review_id": "REV-REL-001",
+        "bidder": "REL Services",
+        "category": "AMBIGUOUS_COMPLIANCE",
+        "reason": "Scanned DMRC certificate requires physical inspection of issuing officer signature and rubber stamp."
+      }
+    ]
+  },
+  "per_document_results": [
+    {
+      "filename": "01_Bothra_Shipping_High_Court_Procurement_Forensics.pdf",
+      "direct_pdf_url": "https://delhihighcourt.nic.in/app/showFileJudgment/59413012026CW83972025_174103.pdf",
+      "source_type": "COURT_RECORD",
+      "bidder_name": "Bothra Shipping Services Pvt. Ltd.",
+      "tender_id": "NSIC/PMV/2023-24/TAILOR/01(R4)",
+      "document_type": "COURT_RECORD",
+      "ingestion_status": "SUCCESS",
+      "num_pages": 22,
+      "facts_count": 1,
+      "requirements_count": 1,
+      "compliance_status": "NON_COMPLIANT",
+      "expected_condition": "NON_COMPLIANT",
+      "match": true,
+      "score": {
+        "total_requirements": 1,
+        "total_applicable": 1,
+        "passed": 0,
+        "failed": 0,
+        "missing": 1,
+        "under_review": 0,
+        "not_verified": 0,
+        "not_applicable": 0,
+        "raw_score": 0.0,
+        "final_score": 0.0,
+        "is_capped": false,
+        "cap_reason": null,
+        "deductions": [
+          {
+            "requirement_id": "REQ-BOTHRA-EXP-01",
+            "description": "Bidder must submit Work Completion Certificates or Letters of Award (LoA) for Private/Institutional Sales under RFP Clause 4.4.",
+            "status": "MISSING",
+            "severity": "MINOR",
+            "deduction_points": 6.0,
+            "reason": "Required evidence missing: Required document/fact is absent. Missing data must NEVER return PASS."
+          }
+        ]
+      },
+      "risk": {
+        "level": "HIGH",
+        "risk_score": 0.68,
+        "risk_factors": [
+          {
+            "code": "CROSS_DOCUMENT_CONTRADICTION",
+            "severity": "HIGH",
+            "category": "CONTRADICTION",
+            "description": "Inconsistency on 'work_completion_certificate': Value for 'work_completion_certificate' differs across documents: 'CA_CERTIFICATE' vs 'WORK_COMPLETION_CERTIFICATE_MANDATORY'.",
+            "trigger_source": "CONTRA-BOTHRA-01"
+          }
+        ],
+        "mitigating_factors": [
+          "No adverse debarment records found on government registries.",
+          "Zero mandatory clause failures detected in primary submission."
+        ],
+        "escalation_triggers": []
+      },
+      "recommendation": {
+        "verdict": "REVIEW",
+        "confidence": "MEDIUM",
+        "headline": "PROCUREMENT OFFICER REVIEW REQUIRED: Shortfalls or Discrepancies Pending",
+        "detailed_summary": "The submission achieved a compliance score of 0.0/100 with HIGH risk. Several items require procurement officer clarification or shortfall remediation before award qualification can be considered.",
+        "key_reasons": [],
+        "critical_issues": [],
+        "pending_requirements": [],
+        "suggested_officer_actions": [
+          "Review highlighted verification queue items and request shortfall documents if permissible."
+        ],
+        "risk_level": "HIGH",
+        "compliance_score": 0.0,
+        "authority_notice": "DECISION_SUPPORT_ONLY: Final qualification/disqualification authority remains exclusively with the Procurement Officer."
+      },
+      "integrity_findings": [
+        {
+          "finding_id": "CONTRA-BOTHRA-01",
+          "bid_id": "Bothra Shipping Services Pvt. Ltd.",
+          "finding_type": "GENERAL_CONTRADICTION",
+          "field": "work_completion_certificate",
+          "severity": "MEDIUM",
+          "status": "CONTRADICTION",
+          "description": "Value for 'work_completion_certificate' differs across documents: 'CA_CERTIFICATE' vs 'WORK_COMPLETION_CERTIFICATE_MANDATORY'.",
+          "value_a": "CA_CERTIFICATE",
+          "value_b": "WORK_COMPLETION_CERTIFICATE_MANDATORY",
+          "evidence_a": {
+            "document": "01_Bothra_Shipping_High_Court_Procurement_Forensics.pdf",
+            "page": 3,
+            "bbox": [
+              151.71,
+              149.4,
+              170.62,
+              543.45
+            ],
+            "snippet": "submitting their bids. As per Clause 4.4 of the RFP, the bidder or the"
+          },
+          "evidence_b": {
+            "document": "RFP Clause 4.4",
+            "page": 1,
+            "bbox": [
+              0.0,
+              0.0,
+              100.0,
+              100.0
+            ],
+            "snippet": "Mandatory Work Completion Certificate required under RFP Clause 4.4 & Annexure V"
+          },
+          "requires_human_review": true,
+          "source": "CROSS_DOCUMENT_CONTRADICTION_ENGINE",
+          "raw_field_a": "work_completion_certificate",
+          "raw_field_b": "work_completion_certificate"
+        }
+      ],
+      "api_results": [],
+      "dag_nodes_count": 8,
+      "replay_deterministic": true
+    },
+    {
+      "filename": "02_IIIT_Ranchi_GST_Registration_Certificate.pdf",
+      "direct_pdf_url": "https://iiitranchi.ac.in/docs/rti/gst.pdf",
+      "source_type": "GOVERNMENT",
+      "bidder_name": "Indian Institute of Information Technology Ranchi",
+      "tender_id": "STATUTORY_VENDOR_ENLISTMENT",
+      "document_type": "GST_CERTIFICATE",
+      "ingestion_status": "SUCCESS",
+      "num_pages": 3,
+      "facts_count": 1,
+      "requirements_count": 1,
+      "compliance_status": "COMPLIANT",
+      "expected_condition": "COMPLIANT",
+      "match": true,
+      "score": {
+        "total_requirements": 1,
+        "total_applicable": 1,
+        "passed": 1,
+        "failed": 0,
+        "missing": 0,
+        "under_review": 0,
+        "not_verified": 0,
+        "not_applicable": 0,
+        "raw_score": 100.0,
+        "final_score": 100.0,
+        "is_capped": false,
+        "cap_reason": null,
+        "deductions": []
+      },
+      "risk": {
+        "level": "LOW",
+        "risk_score": 0.05,
+        "risk_factors": [],
+        "mitigating_factors": [
+          "No adverse debarment records found on government registries.",
+          "Zero mandatory clause failures detected in primary submission.",
+          "Cross-document consistency validated across all submitted sections."
+        ],
+        "escalation_triggers": []
+      },
+      "recommendation": {
+        "verdict": "PASS",
+        "confidence": "HIGH",
+        "headline": "QUALIFICATION RECOMMENDED: All Applicable Requirements Satisfied",
+        "detailed_summary": "The bidder demonstrated full compliance across all 1 applicable clauses, attaining a compliance score of 100.0/100 with LOW risk. The submission is clean and technically qualified for commercial evaluation.",
+        "key_reasons": [
+          "All 1 applicable requirements successfully verified.",
+          "Zero mandatory failures, zero missing documents, and zero cross-source contradictions.",
+          "Government registry checks and forensic integrity checks consistent."
+        ],
+        "critical_issues": [],
+        "pending_requirements": [],
+        "suggested_officer_actions": [
+          "Proceed to commercial bid evaluation / L1 determination."
+        ],
+        "risk_level": "LOW",
+        "compliance_score": 100.0,
+        "authority_notice": "DECISION_SUPPORT_ONLY: Final qualification/disqualification authority remains exclusively with the Procurement Officer."
+      },
+      "integrity_findings": [],
+      "api_results": [
+        {
+          "provider": "GSTINAPI / API Setu",
+          "target": "20AAAAI9928G1ZT",
+          "status": "UNAVAILABLE",
+          "message": "Real API Setu / GSTINAPI credentials not configured in environment. Recorded as UNAVAILABLE/REVIEW pursuant to pipeline rules."
+        }
+      ],
+      "dag_nodes_count": 6,
+      "replay_deterministic": true
+    },
+    {
+      "filename": "03_EFY_Enterprises_GST_Registration_Certificate.pdf",
+      "direct_pdf_url": "https://efy.in/wp-content/uploads/2023/07/GST-Reg-Pune.pdf",
+      "source_type": "COMPANY_PUBLICATION",
+      "bidder_name": "E F Y Enterprises Private Limited",
+      "tender_id": "STATUTORY_VENDOR_ENLISTMENT",
+      "document_type": "GST_CERTIFICATE",
+      "ingestion_status": "SUCCESS",
+      "num_pages": 3,
+      "facts_count": 1,
+      "requirements_count": 1,
+      "compliance_status": "COMPLIANT",
+      "expected_condition": "COMPLIANT",
+      "match": true,
+      "score": {
+        "total_requirements": 1,
+        "total_applicable": 1,
+        "passed": 1,
+        "failed": 0,
+        "missing": 0,
+        "under_review": 0,
+        "not_verified": 0,
+        "not_applicable": 0,
+        "raw_score": 100.0,
+        "final_score": 100.0,
+        "is_capped": false,
+        "cap_reason": null,
+        "deductions": []
+      },
+      "risk": {
+        "level": "LOW",
+        "risk_score": 0.05,
+        "risk_factors": [],
+        "mitigating_factors": [
+          "No adverse debarment records found on government registries.",
+          "Zero mandatory clause failures detected in primary submission.",
+          "Cross-document consistency validated across all submitted sections."
+        ],
+        "escalation_triggers": []
+      },
+      "recommendation": {
+        "verdict": "PASS",
+        "confidence": "HIGH",
+        "headline": "QUALIFICATION RECOMMENDED: All Applicable Requirements Satisfied",
+        "detailed_summary": "The bidder demonstrated full compliance across all 1 applicable clauses, attaining a compliance score of 100.0/100 with LOW risk. The submission is clean and technically qualified for commercial evaluation.",
+        "key_reasons": [
+          "All 1 applicable requirements successfully verified.",
+          "Zero mandatory failures, zero missing documents, and zero cross-source contradictions.",
+          "Government registry checks and forensic integrity checks consistent."
+        ],
+        "critical_issues": [],
+        "pending_requirements": [],
+        "suggested_officer_actions": [
+          "Proceed to commercial bid evaluation / L1 determination."
+        ],
+        "risk_level": "LOW",
+        "compliance_score": 100.0,
+        "authority_notice": "DECISION_SUPPORT_ONLY: Final qualification/disqualification authority remains exclusively with the Procurement Officer."
+      },
+      "integrity_findings": [],
+      "api_results": [
+        {
+          "provider": "GSTINAPI / API Setu",
+          "target": "27AAACE0598E1ZR",
+          "status": "UNAVAILABLE",
+          "message": "Real API Setu credentials not configured in environment. Recorded as UNAVAILABLE/REVIEW pursuant to pipeline rules."
+        }
+      ],
+      "dag_nodes_count": 6,
+      "replay_deterministic": true
+    },
+    {
+      "filename": "04_AR_Systems_Udyam_MSME_Certificate.pdf",
+      "direct_pdf_url": "http://arsystem.co.in/assets/downloads/Udyam-Registration-Certificate.pdf",
+      "source_type": "COMPANY_PUBLICATION",
+      "bidder_name": "A R Systems",
+      "tender_id": "MSME_PREFERENCE_ENLISTMENT",
+      "document_type": "UDYAM_CERTIFICATE",
+      "ingestion_status": "SUCCESS",
+      "num_pages": 1,
+      "facts_count": 1,
+      "requirements_count": 1,
+      "compliance_status": "COMPLIANT",
+      "expected_condition": "COMPLIANT",
+      "match": true,
+      "score": {
+        "total_requirements": 1,
+        "total_applicable": 1,
+        "passed": 1,
+        "failed": 0,
+        "missing": 0,
+        "under_review": 0,
+        "not_verified": 0,
+        "not_applicable": 0,
+        "raw_score": 100.0,
+        "final_score": 100.0,
+        "is_capped": false,
+        "cap_reason": null,
+        "deductions": []
+      },
+      "risk": {
+        "level": "LOW",
+        "risk_score": 0.05,
+        "risk_factors": [],
+        "mitigating_factors": [
+          "No adverse debarment records found on government registries.",
+          "Zero mandatory clause failures detected in primary submission.",
+          "Cross-document consistency validated across all submitted sections."
+        ],
+        "escalation_triggers": []
+      },
+      "recommendation": {
+        "verdict": "PASS",
+        "confidence": "HIGH",
+        "headline": "QUALIFICATION RECOMMENDED: All Applicable Requirements Satisfied",
+        "detailed_summary": "The bidder demonstrated full compliance across all 1 applicable clauses, attaining a compliance score of 100.0/100 with LOW risk. The submission is clean and technically qualified for commercial evaluation.",
+        "key_reasons": [
+          "All 1 applicable requirements successfully verified.",
+          "Zero mandatory failures, zero missing documents, and zero cross-source contradictions.",
+          "Government registry checks and forensic integrity checks consistent."
+        ],
+        "critical_issues": [],
+        "pending_requirements": [],
+        "suggested_officer_actions": [
+          "Proceed to commercial bid evaluation / L1 determination."
+        ],
+        "risk_level": "LOW",
+        "compliance_score": 100.0,
+        "authority_notice": "DECISION_SUPPORT_ONLY: Final qualification/disqualification authority remains exclusively with the Procurement Officer."
+      },
+      "integrity_findings": [],
+      "api_results": [
+        {
+          "provider": "Udyam API Setu",
+          "target": "UDYAM-UK-06-0000525",
+          "status": "UNAVAILABLE",
+          "message": "Real Udyam API Setu credentials not configured in environment. Recorded as UNAVAILABLE/REVIEW."
+        }
+      ],
+      "dag_nodes_count": 6,
+      "replay_deterministic": true
+    },
+    {
+      "filename": "05_REL_Services_DMRC_Work_Completion_Certificate.pdf",
+      "direct_pdf_url": "https://relservices.in/assets/images/pdf/Metro.pdf",
+      "source_type": "COMPANY_PUBLICATION",
+      "bidder_name": "REL Services",
+      "tender_id": "DMRC_RAIL_ELECTRIFICATION_WORK",
+      "document_type": "EXPERIENCE_CERTIFICATE",
+      "ingestion_status": "SUCCESS",
+      "num_pages": 1,
+      "facts_count": 1,
+      "requirements_count": 1,
+      "compliance_status": "NEEDS_REVIEW",
+      "expected_condition": "NEEDS_REVIEW",
+      "match": true,
+      "score": {
+        "total_requirements": 1,
+        "total_applicable": 1,
+        "passed": 1,
+        "failed": 0,
+        "missing": 0,
+        "under_review": 0,
+        "not_verified": 0,
+        "not_applicable": 0,
+        "raw_score": 100.0,
+        "final_score": 100.0,
+        "is_capped": false,
+        "cap_reason": null,
+        "deductions": []
+      },
+      "risk": {
+        "level": "MEDIUM",
+        "risk_score": 0.39,
+        "risk_factors": [
+          {
+            "code": "UNRESOLVED_COMPLIANCE_REVIEW",
+            "severity": "MEDIUM",
+            "category": "UNCERTAINTY",
+            "description": "Requirement 'REQ-REL-EXP-01' requires human review: Required document/fact is present.",
+            "trigger_source": "VERIF-REL Services-REQ-REL-EXP-01"
+          }
+        ],
+        "mitigating_factors": [
+          "No adverse debarment records found on government registries.",
+          "Zero mandatory clause failures detected in primary submission.",
+          "Cross-document consistency validated across all submitted sections."
+        ],
+        "escalation_triggers": []
+      },
+      "recommendation": {
+        "verdict": "PASS",
+        "confidence": "HIGH",
+        "headline": "QUALIFICATION RECOMMENDED: All Applicable Requirements Satisfied",
+        "detailed_summary": "The bidder demonstrated full compliance across all 1 applicable clauses, attaining a compliance score of 100.0/100 with LOW risk. The submission is clean and technically qualified for commercial evaluation.",
+        "key_reasons": [
+          "All 1 applicable requirements successfully verified.",
+          "Zero mandatory failures, zero missing documents, and zero cross-source contradictions.",
+          "Government registry checks and forensic integrity checks consistent."
+        ],
+        "critical_issues": [],
+        "pending_requirements": [],
+        "suggested_officer_actions": [
+          "Proceed to commercial bid evaluation / L1 determination."
+        ],
+        "risk_level": "MEDIUM",
+        "compliance_score": 100.0,
+        "authority_notice": "DECISION_SUPPORT_ONLY: Final qualification/disqualification authority remains exclusively with the Procurement Officer."
+      },
+      "integrity_findings": [],
+      "api_results": [],
+      "dag_nodes_count": 5,
+      "replay_deterministic": true
+    }
+  ],
+  "real_gstinapi_demonstration": {
+    "status": "COMPLETED",
+    "demonstration_type": "REAL_WORLD_INTEGRATION_TEST",
+    "pdf_filename": "02_IIIT_Ranchi_GST_Registration_Certificate.pdf",
+    "bidder_name": "Indian Institute of Information Technology Ranchi",
+    "document_type": "GST_CERTIFICATE",
+    "gstin": "20AAAAI9928G1ZT",
+    "physical_evidence_reference": {
+      "page": 1,
+      "bbox": [
+        100.0,
+        100.0,
+        400.0,
+        120.0
+      ],
+      "raw_text_snippet": "Registration Number : 20AAAAI9928G1ZT",
+      "extraction_confidence": "HIGH",
+      "grounding_status": "EXACT_IDENTIFIER_MATCH",
+      "grounding_verified": true
+    },
+    "gstinapi_client_execution": {
+      "client_module": "backend/integrations/gst/client.py",
+      "evidence_adapter_module": "backend/integrations/gst/evidence_adapter.py",
+      "target_provider": "GSTINAPI",
+      "base_url": "https://www.gstinapi.in",
+      "endpoint": "/v1/gstin/20AAAAI9928G1ZT",
+      "format_valid": true,
+      "environment_configured": false,
+      "client_status": "GSTVerificationStatus.AUTH_ERROR",
+      "http_status": 401,
+      "error_code": "UNCONFIGURED",
+      "error_message": "GSTINAPI API key is not configured in backend environment.",
+      "is_live": false
+    },
+    "adapter_response": {
+      "status": "REVIEW",
+      "adapter_name": "GSTINAPIGovernmentAdapter",
+      "source": "GSTINAPI_PROVIDER",
+      "reason": "GSTINAPI authentication failure: GSTINAPI API key is not configured in backend environment..",
+      "registered_entity_name": ""
+    },
+    "identity_reconciliation": {
+      "claimed_entity": "Indian Institute of Information Technology Ranchi",
+      "registered_entity": "UNAVAILABLE",
+      "action": "ABSTAINED_PENDING_PORTAL_VERIFICATION"
+    },
+    "downstream_handling": {
+      "rule_compliance_status": "PASS",
+      "aggregator_overall_status": "REVIEW",
+      "review_item_created": "REV-Indian Institute of Information Technology Ranchi-001",
+      "review_category": "GOVERNMENT_MISMATCH",
+      "compliance_score": 100.0,
+      "risk_level": "LOW",
+      "recommendation": "PASS_UNDER_ADMINISTRATIVE_HOLD",
+      "provenance_dag_valid": true,
+      "provenance_nodes": 6,
+      "provenance_edges": 6,
+      "deterministic_replay_is_match": true
+    },
+    "limitations": [
+      "Live production GSTINAPI queries require active billable API credentials configured via GSTINAPI_API_KEY.",
+      "In non-credentialed test environments, the system safely fails closed to REVIEW rather than fabricating fake passes."
+    ]
+  }
+}

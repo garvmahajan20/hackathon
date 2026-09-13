@@ -151,7 +151,7 @@ export const NewVerificationPage: React.FC = () => {
     if (tenderId.trim()) formData.append("tender_id", tenderId.trim());
     if (bidId.trim()) formData.append("bid_id", bidId.trim());
     if (companyName.trim()) formData.append("company_name", companyName.trim());
-    formData.append("mode", "mock");
+    formData.append("mode", "live");
 
     try {
       const result = await apiClient.verifyBid(formData);
@@ -165,6 +165,16 @@ export const NewVerificationPage: React.FC = () => {
       setIsComplete(true);
       setIsProcessing(false);
       setCompletedResult(result);
+
+      // Persist live verification identifier to local storage registry
+      try {
+        const rawList = localStorage.getItem("jarvis_recent_verifications");
+        const existing: string[] = rawList ? JSON.parse(rawList) : [];
+        const updated = [result.verification_id, ...existing.filter((id) => id !== result.verification_id)].slice(0, 50);
+        localStorage.setItem("jarvis_recent_verifications", JSON.stringify(updated));
+      } catch (storageErr) {
+        console.warn("Could not persist recent verification ID:", storageErr);
+      }
     } catch (err: any) {
       if (intervalRef.current) {
         window.clearInterval(intervalRef.current);

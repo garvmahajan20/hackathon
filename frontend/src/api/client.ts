@@ -86,6 +86,20 @@ export const apiClient = {
   },
 
   /**
+   * Retrieves all persisted verifications across backend disk cache and session
+   */
+  async getVerifications(): Promise<AggregatedVerification[]> {
+    return request<AggregatedVerification[]>("/api/v1/verifications");
+  },
+
+  /**
+   * Retrieves all human review queue items across all persisted verifications
+   */
+  async getReviewQueue(): Promise<HumanReviewItem[]> {
+    return request<HumanReviewItem[]>("/api/v1/review-queue");
+  },
+
+  /**
    * Executes verification on uploaded tender & bid documents
    */
   async verifyBid(formData: FormData): Promise<AggregatedVerification> {

@@ -48,6 +48,7 @@ class HumanReviewItem:
     evidence_references: List[Dict[str, Any]] = dc.field(default_factory=list)
     source_documents: List[str] = dc.field(default_factory=list)
     source_pages: List[int] = dc.field(default_factory=list)
+    verification_id: Optional[str] = None
     related_verification_id: Optional[str] = None
     created_at: str = dc.field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
     status: str = ReviewItemStatus.OPEN.value

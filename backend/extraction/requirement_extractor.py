@@ -13,7 +13,7 @@ from backend.core.normalization import (
 from backend.ingestion.models import ExtractionResult
 from .cache import LLMCache
 from .evidence_grounder import EvidenceGrounder
-from .models import CandidateRequirement, ExtractionStatus, LLMMode
+from .models import CandidateRequirement, ExtractionStatus, LLMMode, LLMProviderError
 from .prompts import (
     REQUIREMENT_PROMPT_VERSION,
     TENDER_REQUIREMENT_SYSTEM_PROMPT,
@@ -174,6 +174,13 @@ class TenderRequirementExtractor:
                 system_prompt=TENDER_REQUIREMENT_SYSTEM_PROMPT,
             )
             if resp.error:
+                if self.mode == LLMMode.LIVE:
+                    raise LLMProviderError(
+                        f"Tender requirement extraction failed via {self.provider.provider_name} ({self.provider.model_name}): {resp.error}",
+                        provider_name=self.provider.provider_name,
+                        model_name=self.provider.model_name,
+                        error_detail=resp.error,
+                    )
                 return []
             response_text = resp.content
             if self.mode == LLMMode.LIVE and not resp.is_mock:
@@ -209,6 +216,13 @@ class TenderRequirementExtractor:
                     system_prompt=TENDER_EXHAUSTIVE_CONDITION_SYSTEM_PROMPT,
                 )
                 if resp.error:
+                    if self.mode == LLMMode.LIVE:
+                        raise LLMProviderError(
+                            f"Tender requirement extraction failed on page {page.page_number} via {self.provider.provider_name} ({self.provider.model_name}): {resp.error}",
+                            provider_name=self.provider.provider_name,
+                            model_name=self.provider.model_name,
+                            error_detail=resp.error,
+                        )
                     print(f"Extraction warning on page {page.page_number}: {resp.error}")
                 if not resp.error and resp.content:
                     p1_text = resp.content
@@ -241,6 +255,13 @@ class TenderRequirementExtractor:
                 system_prompt=TENDER_BIDDER_OBLIGATION_SYSTEM_PROMPT,
             )
             if resp_p2.error:
+                if self.mode == LLMMode.LIVE and not raw_candidates:
+                    raise LLMProviderError(
+                        f"Tender bidder-obligation extraction failed via {self.provider.provider_name} ({self.provider.model_name}): {resp_p2.error}",
+                        provider_name=self.provider.provider_name,
+                        model_name=self.provider.model_name,
+                        error_detail=resp_p2.error,
+                    )
                 print(f"Extraction warning on pass 2: {resp_p2.error}")
             if not resp_p2.error and resp_p2.content:
                 p2_text = resp_p2.content

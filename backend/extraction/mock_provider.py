@@ -106,10 +106,11 @@ class MockLLMProvider(BaseLLMProvider):
         # Find all blocks in prompt formatted as [block_id] text
         blocks = re.findall(r"\[([^\]\n]+)\]\s*([^\n]*)", prompt)
         block_matches = [b[0] for b in blocks] if blocks else re.findall(r"\[([^\]\n]+)\]", prompt)
+        doc_text = " ".join([b[1] for b in blocks]) if blocks else prompt
 
-        # Look for turnover patterns in text
-        if "turnover" in prompt.lower():
-            m = re.search(r"(\d+(?:\.\d+)?)\s*(?:crore|cr|lakh)", prompt, re.IGNORECASE)
+        # Look for turnover patterns in document text
+        if re.search(r"\bturnover\b", doc_text, re.IGNORECASE):
+            m = re.search(r"(\d+(?:\.\d+)?)\s*(?:crore|cr|lakh)", doc_text, re.IGNORECASE)
             val = m.group(0) if m else "10 Crore"
             b_id = self._find_block_for_keyword(blocks, ["turnover", "crore", "cr", "lakh"]) or (block_matches[0] if block_matches else None)
             reqs.append({
@@ -124,8 +125,8 @@ class MockLLMProvider(BaseLLMProvider):
             })
 
         # Look for warranty
-        if "warranty" in prompt.lower():
-            m = re.search(r"(\d+)\s*(?:years?|months?)", prompt, re.IGNORECASE)
+        if re.search(r"\bwarranty\b", doc_text, re.IGNORECASE):
+            m = re.search(r"(\d+)\s*(?:years?|months?)", doc_text, re.IGNORECASE)
             val = m.group(0) if m else "3 years"
             b_id = self._find_block_for_keyword(blocks, ["warranty", "guarantee", "maintenance"]) or (block_matches[-1] if block_matches else None)
             reqs.append({
@@ -140,8 +141,8 @@ class MockLLMProvider(BaseLLMProvider):
             })
 
         # Look for delivery
-        if "delivery" in prompt.lower():
-            m = re.search(r"(\d+)\s*days", prompt, re.IGNORECASE)
+        if re.search(r"\bdelivery\b", doc_text, re.IGNORECASE):
+            m = re.search(r"(\d+)\s*days", doc_text, re.IGNORECASE)
             val = m.group(0) if m else "60 days"
             b_id = self._find_block_for_keyword(blocks, ["delivery", "days", "schedule"]) or (block_matches[0] if block_matches else None)
             reqs.append({
@@ -155,7 +156,7 @@ class MockLLMProvider(BaseLLMProvider):
             })
 
         # Look for GST / Statutory
-        if "gst" in prompt.lower() or "gstin" in prompt.lower():
+        if re.search(r"\bgst(?:in)?\b", doc_text, re.IGNORECASE):
             b_id = self._find_block_for_keyword(blocks, ["gst", "gstin", "tax", "registration"]) or (block_matches[0] if block_matches else None)
             reqs.append({
                 "description": "Bidder must possess valid GSTIN registration",
@@ -169,7 +170,7 @@ class MockLLMProvider(BaseLLMProvider):
             })
 
         # Look for PAN
-        if "pan" in prompt.lower():
+        if re.search(r"\bpan\b", doc_text, re.IGNORECASE):
             b_id = self._find_block_for_keyword(blocks, ["pan", "income tax"]) or (block_matches[0] if block_matches else None)
             reqs.append({
                 "description": "Bidder must furnish Permanent Account Number (PAN)",
@@ -183,7 +184,7 @@ class MockLLMProvider(BaseLLMProvider):
             })
 
         # Look for ISO
-        if "iso" in prompt.lower():
+        if re.search(r"\biso\b", doc_text, re.IGNORECASE):
             b_id = self._find_block_for_keyword(blocks, ["iso", "quality", "certification"]) or (block_matches[-1] if block_matches else None)
             reqs.append({
                 "description": "Bidder must have valid ISO certification",
@@ -195,44 +196,6 @@ class MockLLMProvider(BaseLLMProvider):
                 "evidence_block_ids": [b_id] if b_id else [],
                 "source_clause": "Clause 5.1",
             })
-
-        # Fallback if no specific keyword matched but document has text blocks
-        if not reqs and block_matches:
-            b0 = block_matches[0]
-            reqs.append({
-                "description": "Bidder must submit valid GST registration certificate",
-                "category": "STATUTORY_ELIGIBILITY",
-                "field": "gstin",
-                "operator": "EXISTS",
-                "expected_value": "Valid GSTIN",
-                "mandatory": True,
-                "evidence_block_ids": [b0],
-                "source_clause": "Clause 1.1",
-            })
-            if len(block_matches) > 1:
-                b1 = block_matches[1]
-                reqs.append({
-                    "description": "Bidder must furnish Permanent Account Number (PAN)",
-                    "category": "STATUTORY_ELIGIBILITY",
-                    "field": "pan",
-                    "operator": "EXISTS",
-                    "expected_value": "Valid PAN",
-                    "mandatory": True,
-                    "evidence_block_ids": [b1],
-                    "source_clause": "Clause 1.2",
-                })
-            if len(block_matches) > 2:
-                b2 = block_matches[2]
-                reqs.append({
-                    "description": "Minimum financial turnover requirement of 1.0 Crore",
-                    "category": "FINANCIAL_CAPACITY",
-                    "field": "turnover_cr",
-                    "operator": ">=",
-                    "expected_value": "1.0 Crore",
-                    "mandatory": True,
-                    "evidence_block_ids": [b2],
-                    "source_clause": "Clause 2.1",
-                })
 
         return reqs
 
@@ -315,20 +278,5 @@ class MockLLMProvider(BaseLLMProvider):
                 "evidence_block_ids": [b_id] if b_id else [],
                 "extraction_confidence": "HIGH",
             })
-
-        # Fallback if no specific facts matched but blocks exist: ground from first block text
-        if not facts and blocks:
-            for b_id, b_text in blocks[:2]:
-                text_clean = b_text.strip()
-                if len(text_clean) >= 3:
-                    # Use a snippet that strictly exists in the block text
-                    snippet = text_clean[:50].strip()
-                    facts.append({
-                        "field": "company_name",
-                        "raw_value": snippet,
-                        "evidence_block_ids": [b_id],
-                        "extraction_confidence": "HIGH",
-                    })
-                    break
 
         return facts

@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 import sys
 sys.stdout.reconfigure(encoding="utf-8")
 import io
@@ -131,6 +131,28 @@ class TestStep8Api(unittest.TestCase):
         resp_err = self.client.get("/api/v1/verification/UNKNOWN_ID")
         if api_key:
             self.assertNotIn(api_key, resp_err.text)
+
+    # 12. List all persisted verifications across disk cache and session
+    def test_12_list_all_verifications(self):
+        resp = self.client.get("/api/v1/verifications")
+        self.assertEqual(resp.status_code, 200)
+        verifs = resp.json()
+        self.assertIsInstance(verifs, list)
+        self.assertGreater(len(verifs), 0)
+        self.assertIn("verification_id", verifs[0])
+        self.assertIn("overall_status", verifs[0])
+
+    # 13. Aggregate review queue items across all verifications
+    def test_13_get_all_review_queue_items(self):
+        resp = self.client.get("/api/v1/review-queue")
+        self.assertEqual(resp.status_code, 200)
+        queue_items = resp.json()
+        self.assertIsInstance(queue_items, list)
+        self.assertGreater(len(queue_items), 0)
+        first = queue_items[0]
+        self.assertIn("review_id", first)
+        self.assertIn("bid_id", first)
+        self.assertIn("category", first)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

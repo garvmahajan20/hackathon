@@ -42,6 +42,9 @@ def normalize_numeric(value: Any, default_unit: Optional[str] = None) -> Tuple[O
         detected_unit = "INR"
         cleaned = re.sub(r"[?]|rs\.?|inr|rupees", "", cleaned).strip()
 
+    # Strip parenthetical plural markers like (s) or (es)
+    cleaned = re.sub(r"\(\s*[a-z]{1,2}\s*\)", "", cleaned).strip()
+
     # Detect scale multipliers
     multiplier = Decimal("1")
     if re.search(r"\b(crores?|crs?)\b", cleaned):
@@ -61,6 +64,14 @@ def normalize_numeric(value: Any, default_unit: Optional[str] = None) -> Tuple[O
 
     # Clean commas, spaces
     cleaned = cleaned.replace(",", "").strip()
+
+    # Check if percentage
+    if "%" in cleaned:
+        detected_unit = "PERCENT"
+        cleaned = cleaned.replace("%", "").strip()
+
+    # Strip standard procurement qualifier phrases
+    cleaned = re.sub(r"\b(of\s+bid\s+quantity|of\s+contract\s+value|of\s+bid\s+value|of\s+total\s+value|of\s+quantity)\b", "", cleaned).strip()
 
     # Check if remaining string has non-currency alphabetic characters (e.g. ISO 9001:2015, Grade A)
     # If so, it is an alphanumeric code or categorical string, not a pure numeric value
@@ -160,6 +171,33 @@ def normalize_duration(value: Any, target_unit: str = "MONTHS") -> Tuple[Optiona
     cleaned = value.strip().lower()
     for word, digit in WORD_TO_NUM.items():
         cleaned = re.sub(rf"\b{word}\b", digit, cleaned)
+
+    # Match number attached to duration unit
+    dur_match = re.search(r"\b(\d+(?:\.\d+)?)\s*(years?|yrs?|yr|months?|mths?|mth|mo|days?|d)\b", cleaned)
+    if dur_match:
+        qty = Decimal(dur_match.group(1))
+        unit_str = dur_match.group(2)
+        if re.match(r"^(years?|yrs?|yr)$", unit_str):
+            if target_unit == "MONTHS":
+                return qty * Decimal("12"), "MONTHS"
+            elif target_unit == "DAYS":
+                return qty * Decimal("365"), "DAYS"
+            else:
+                return qty, "YEARS"
+        elif re.match(r"^(months?|mths?|mth|mo)$", unit_str):
+            if target_unit == "MONTHS":
+                return qty, "MONTHS"
+            elif target_unit == "DAYS":
+                return qty * Decimal("30"), "DAYS"
+            else:
+                return qty / Decimal("12"), "YEARS"
+        elif re.match(r"^(days?|d)$", unit_str):
+            if target_unit == "DAYS":
+                return qty, "DAYS"
+            elif target_unit == "MONTHS":
+                return qty / Decimal("30"), "MONTHS"
+            else:
+                return qty / Decimal("365"), "YEARS"
 
     # Extract numeric part
     num_match = re.search(r"\b(\d+(?:\.\d+)?)\b", cleaned)

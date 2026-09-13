@@ -98,12 +98,18 @@ class TenderRequirement:
     precedence_notes: Optional[str] = None
     canonical_field: Optional[str] = None
     field_resolution: Optional[Dict[str, Any]] = None
+    requirement_type: str = "BIDDER_COMPLIANCE"
 
     def __post_init__(self):
+        if not self.requirement_type or self.requirement_type == "BIDDER_COMPLIANCE":
+            if self.applicability and isinstance(self.applicability, dict):
+                req_type = self.applicability.get("requirement_type")
+                if req_type:
+                    self.requirement_type = str(req_type).upper()
         if self.field_resolution is None and self.field:
             from .ontology import resolve_field
             res = resolve_field(self.field)
-            if self.canonical_field is None:
+            if self.canonical_field is None and res.resolution_status == "RESOLVED":
                 self.canonical_field = res.canonical_field_id
             self.field_resolution = res.to_dict()
 
@@ -118,6 +124,7 @@ class TenderRequirement:
             "source_type": self.source_type,
             "source_priority": self.source_priority,
             "extraction_confidence": self.extraction_confidence,
+            "requirement_type": self.requirement_type,
         }
         if self.field is not None:
             d["field"] = self.field
@@ -163,6 +170,7 @@ class TenderRequirement:
             extraction_confidence=data.get("extraction_confidence", "HIGH"),
             canonical_field=data.get("canonical_field"),
             field_resolution=data.get("field_resolution"),
+            requirement_type=data.get("requirement_type") or (data.get("applicability", {}).get("requirement_type") if isinstance(data.get("applicability"), dict) else "BIDDER_COMPLIANCE"),
         )
 
 @dataclass

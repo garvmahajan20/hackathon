@@ -18,6 +18,7 @@ class HumanReviewItemResponse(BaseModel):
     evidence_references: List[Dict[str, Any]] = []
     source_documents: List[str] = []
     source_pages: List[int] = []
+    verification_id: Optional[str] = None
     related_verification_id: Optional[str] = None
     created_at: str
     status: str

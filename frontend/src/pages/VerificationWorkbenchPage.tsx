@@ -82,6 +82,18 @@ export const VerificationWorkbenchPage: React.FC = () => {
         setLoadedVerification(verifData);
         if (dossierData) setLoadedDossier(dossierData);
         setIsLoading(false);
+
+        // Persist loaded verification ID to local storage registry
+        if (verifData?.verification_id) {
+          try {
+            const rawList = localStorage.getItem("jarvis_recent_verifications");
+            const existing: string[] = rawList ? JSON.parse(rawList) : [];
+            const updated = [verifData.verification_id, ...existing.filter((vid) => vid !== verifData.verification_id)].slice(0, 50);
+            localStorage.setItem("jarvis_recent_verifications", JSON.stringify(updated));
+          } catch (storageErr) {
+            console.warn("Could not persist recent verification ID:", storageErr);
+          }
+        }
       })
       .catch((err) => {
         console.error("Failed to load verification from backend:", err);
@@ -90,25 +102,18 @@ export const VerificationWorkbenchPage: React.FC = () => {
       });
   }, [id]);
 
-  const verification = loadedVerification || SEEDED_DEMO_VERIFICATIONS[0];
+  // Isolate seeded demo cases: Real requested verification IDs must NEVER fall back to demoCases[0]
+  const verification = loadedVerification || (id ? null : SEEDED_DEMO_VERIFICATIONS[0]);
 
-  const demoCase =
-    CANONICAL_DEMO_CASES.find((c) => c.bid_id === verification.bid_id) || {
-      bid_id: verification.bid_id,
-      tender_id: verification.tender_id,
-      company_name:
+  const companyName = verification
+    ? (CANONICAL_DEMO_CASES.find((c) => c.bid_id === verification.bid_id)?.company_name ||
         (verification.processing_metadata as any)?.legal_name ||
         (verification.processing_metadata as any)?.company_name ||
-        verification.bid_id,
-      ground_truth_label: "CLEAN" as const,
-      description: `Verification dossier for bid ${verification.bid_id}`,
-      expected_overall: verification.overall_status,
-      expected_compliance: verification.compliance_status,
-      expected_integrity: verification.integrity_status,
-      highlights: [],
-    };
+        verification.bid_id)
+    : "";
 
   const physicalBlocks: (PhysicalTextBlock & { matched_clause_id?: string })[] = useMemo(() => {
+    if (!verification) return [];
     if (DEMO_PHYSICAL_TEXT_BLOCKS[verification.bid_id]) {
       return DEMO_PHYSICAL_TEXT_BLOCKS[verification.bid_id];
     }
@@ -116,17 +121,18 @@ export const VerificationWorkbenchPage: React.FC = () => {
     const blocks: (PhysicalTextBlock & { matched_clause_id?: string })[] = [];
     const seenBlockIds = new Set<string>();
 
-    // 1. Gather all evidence directly from verification results
-    verification.verification_results.forEach((vr, idx) => {
+    // 1. Gather all genuine evidence directly from verification results
+    verification.verification_results.forEach((vr) => {
       (vr.evidence || []).forEach((ev, evIdx) => {
+        if (!ev.snippet) return;
         const blkId = ev.block_id || `BLK-${vr.requirement_id}-${evIdx}`;
         if (!seenBlockIds.has(blkId)) {
           seenBlockIds.add(blkId);
           blocks.push({
             id: blkId,
             page: ev.page || 1,
-            bbox: (ev.bbox as [number, number, number, number]) || [100 + idx * 40, 50, 130 + idx * 40, 500],
-            text: ev.snippet || `Requirement ${vr.requirement_id}: ${vr.actual || vr.status}`,
+            bbox: (ev.bbox as [number, number, number, number]) || [0, 0, 0, 0],
+            text: ev.snippet,
             grounding_state: "VERIFIED",
             confidence_heuristic: "HIGH",
             clause_id: vr.requirement_id,
@@ -136,38 +142,25 @@ export const VerificationWorkbenchPage: React.FC = () => {
       });
     });
 
-    // 2. Also check if dossier contains additional evidence
-    if (loadedDossier?.evidence && Array.isArray(loadedDossier.evidence)) {
-      loadedDossier.evidence.forEach((ev: any, evIdx: number) => {
-        const blkId = ev.block_id || `DOSSIER-BLK-${evIdx}`;
-        if (!seenBlockIds.has(blkId)) {
-          seenBlockIds.add(blkId);
-          blocks.push({
-            id: blkId,
-            page: ev.page || 1,
-            bbox: (ev.bbox as [number, number, number, number]) || [100 + evIdx * 40, 50, 130 + evIdx * 40, 500],
-            text: ev.snippet || `Evidence snippet ${evIdx + 1}`,
-            grounding_state: "VERIFIED",
-            confidence_heuristic: "HIGH",
-            clause_id: ev.requirement_id || undefined,
-            matched_clause_id: ev.requirement_id || undefined,
-          });
-        }
-      });
-    }
-
-    // 3. Fallback: if no blocks from evidence, synthesize requirement reference blocks
-    if (blocks.length === 0 && verification.verification_results.length > 0) {
-      verification.verification_results.forEach((vr, idx) => {
-        blocks.push({
-          id: `CLAUSE-BLK-${vr.requirement_id}`,
-          page: 1,
-          bbox: [100 + idx * 45, 50, 135 + idx * 45, 500],
-          text: `[${vr.requirement_id}] ${vr.reason || vr.expected || vr.status} — (Status: ${vr.status})`,
-          grounding_state: "VERIFIED",
-          confidence_heuristic: "HIGH",
-          clause_id: vr.requirement_id,
-          matched_clause_id: vr.requirement_id,
+    // 2. Also check if dossier contains additional facts from bidder extraction
+    if (loadedDossier?.bidder?.facts && Array.isArray(loadedDossier.bidder.facts)) {
+      loadedDossier.bidder.facts.forEach((fact: any, fIdx: number) => {
+        (fact.evidence || []).forEach((ev: any, evIdx: number) => {
+          if (!ev.snippet) return;
+          const blkId = ev.block_id || `FACT-BLK-${fIdx}-${evIdx}`;
+          if (!seenBlockIds.has(blkId)) {
+            seenBlockIds.add(blkId);
+            blocks.push({
+              id: blkId,
+              page: ev.page || 1,
+              bbox: (ev.bbox as [number, number, number, number]) || [0, 0, 0, 0],
+              text: ev.snippet,
+              grounding_state: "VERIFIED",
+              confidence_heuristic: "HIGH",
+              clause_id: fact.field || undefined,
+              matched_clause_id: fact.field || undefined,
+            });
+          }
         });
       });
     }
@@ -177,56 +170,39 @@ export const VerificationWorkbenchPage: React.FC = () => {
 
   // Active state
   const [selectedClauseId, setSelectedClauseId] = useState<string | null>(
-    verification.verification_results[0]?.requirement_id || null
+    verification?.verification_results[0]?.requirement_id || null
   );
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeEvidence, setActiveEvidence] = useState<EvidenceData | null>(null);
   const [hoveredEvidence, setHoveredEvidence] = useState<EvidenceData | null>(null);
   const [inspectorPos, setInspectorPos] = useState<{ x: number; y: number } | null>(null);
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<"forensics" | "registries" | "dossier">(
-    verification.integrity_status === "CONTRADICTION" && verification.contradictions.length > 0
+    verification?.integrity_status === "CONTRADICTION" && verification?.contradictions?.length > 0
       ? "registries"
       : "forensics"
   );
 
-  // Sync initial evidence on mount
-  useEffect(() => {
-    if (verification.verification_results[0]) {
-      const first = verification.verification_results[0];
-      const ev = first.evidence[0];
-      setSelectedClauseId(first.requirement_id);
-      setSelectedBlockId(null);
-      if (ev) {
-        setActiveEvidence({
-          document: ev.document,
-          page: ev.page,
-          bbox: ev.bbox,
-          snippet: ev.snippet || "",
-          requirement_id: first.requirement_id,
-          expected: first.expected,
-          actual: first.actual,
-          operator_used: first.operator_used,
-          status: first.status,
-          reason: first.reason,
-          grounding_state: "VERIFIED",
-          confidence_heuristic: "HIGH",
-        });
-      }
-    }
-  }, [verification]);
-
-  // Handle requirement selection -> locate evidence and focus
+  // Handle requirement selection -> locate physical evidence or show clean missing-evidence view
   const handleSelectClause = (clauseId: string) => {
     setSelectedClauseId(clauseId);
     setSelectedBlockId(null);
+
+    if (!verification) {
+      setActiveEvidence(null);
+      return;
+    }
+
+    // Enforce EXACT requirement match
     const item = verification.verification_results.find(
-      (r) => r.requirement_id === clauseId || clauseId.includes(r.requirement_id)
+      (r) => r.requirement_id === clauseId
     );
-    if (item && item.evidence[0]) {
+
+    // 1. If bidder submitted physical evidence for this requirement:
+    if (item && item.evidence && item.evidence.length > 0 && item.evidence[0]) {
       const ev = item.evidence[0];
       setActiveEvidence({
-        document: ev.document,
-        page: ev.page,
+        document: ev.document || `${verification.bid_id}.pdf`,
+        page: ev.page || 1,
         bbox: ev.bbox,
         snippet: ev.snippet || "",
         requirement_id: item.requirement_id,
@@ -238,8 +214,60 @@ export const VerificationWorkbenchPage: React.FC = () => {
         grounding_state: "VERIFIED",
         confidence_heuristic: "HIGH",
       });
+      return;
     }
+
+    // 2. If bidder evidence is missing, check for tender-side requirement specification
+    const tenderReq = loadedDossier?.tender?.requirements?.find(
+      (tr: any) => tr.requirement_id === clauseId
+    );
+    if (tenderReq && tenderReq.evidence && tenderReq.evidence.length > 0 && tenderReq.evidence[0]) {
+      const trEv = tenderReq.evidence[0];
+      setActiveEvidence({
+        document: trEv.document || `${verification.tender_id}.pdf`,
+        page: trEv.page || tenderReq.source_page || 1,
+        bbox: trEv.bbox,
+        snippet: trEv.snippet || tenderReq.description || "",
+        requirement_id: item ? item.requirement_id : clauseId,
+        expected: item?.expected ?? tenderReq.expected_value,
+        actual: "MISSING (No bidder evidence submitted)",
+        operator_used: item?.operator_used ?? tenderReq.operator,
+        status: "MISSING",
+        reason: item?.reason || `No physical evidence provided in bid submission for requirement ${clauseId}.`,
+        grounding_state: "VERIFIED",
+        confidence_heuristic: "HIGH",
+      });
+      return;
+    }
+
+    // 3. Clean missing-evidence state: Never leave previous requirement's evidence active!
+    setActiveEvidence({
+      document: `${verification.bid_id}.pdf`,
+      page: 1,
+      bbox: undefined,
+      snippet: `No physical evidence submitted by bidder for requirement ${clauseId}. Evaluation verdict: ${item?.status || "MISSING"}. Deterministic reason: ${item?.reason || "Clause reference was not substantiated with a physical excerpt or document pointer in the submission."}`,
+      requirement_id: item ? item.requirement_id : clauseId,
+      expected: item?.expected ?? "—",
+      actual: item?.actual ?? "MISSING",
+      operator_used: item?.operator_used ?? "—",
+      status: item?.status || "MISSING",
+      reason: item?.reason || "No evidence submitted.",
+      grounding_state: "UNVERIFIED",
+      confidence_heuristic: "LOW",
+    });
   };
+
+  // Sync initial evidence when verification or dossier is loaded
+  useEffect(() => {
+    if (verification?.verification_results && verification.verification_results.length > 0) {
+      const first = verification.verification_results[0];
+      handleSelectClause(first.requirement_id);
+    } else {
+      setSelectedClauseId(null);
+      setSelectedBlockId(null);
+      setActiveEvidence(null);
+    }
+  }, [verification, loadedDossier]);
 
   const handleSelectEvidenceBlock = (blockId: string) => {
     const block = physicalBlocks.find((b) => b.id === blockId);
@@ -304,13 +332,13 @@ export const VerificationWorkbenchPage: React.FC = () => {
     );
   }
 
-  if (loadError && !loadedVerification) {
+  if (loadError || !verification) {
     return (
       <div className="flex h-[calc(100vh-6rem)] items-center justify-center">
         <div className="max-w-md rounded-xl border border-rose-200 bg-white p-6 text-center shadow-sm">
           <AlertTriangle className="mx-auto h-8 w-8 text-rose-600" />
           <h2 className="mt-3 text-base font-bold text-slate-900">Verification Dossier Unavailable</h2>
-          <p className="mt-1 text-xs text-slate-500">{loadError}</p>
+          <p className="mt-1 text-xs text-slate-500">{loadError || `Verification '${id}' not found.`}</p>
           <Link
             to="/verify/new"
             className="mt-4 inline-flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
@@ -343,7 +371,7 @@ export const VerificationWorkbenchPage: React.FC = () => {
           <div className="border-l border-slate-800 pl-3">
             <div className="flex items-center gap-2">
               <h1 className="text-sm font-bold tracking-tight text-white">
-                {demoCase.company_name}
+                {companyName}
               </h1>
               <span className="font-mono text-[11px] font-bold px-2 py-0.2 rounded bg-slate-800 text-blue-400 border border-slate-700">
                 {verification.bid_id}
@@ -448,11 +476,12 @@ export const VerificationWorkbenchPage: React.FC = () => {
           {/* Left Pane: Document Canvas (45%) */}
           <div className="lg:col-span-5 h-full min-h-0">
             <DocumentCanvas
-              documentName={`${verification.bid_id}.pdf`}
+              documentName={activeEvidence?.document || `${verification.bid_id}.pdf`}
               bidId={verification.bid_id}
               textBlocks={physicalBlocks}
               selectedClauseId={selectedClauseId}
               selectedBlockId={selectedBlockId}
+              activePage={activeEvidence?.page}
               onSelectClause={handleSelectClause}
               onSelectBlock={handleSelectEvidenceBlock}
               onHoverEvidence={(ev, pos) => {
@@ -485,15 +514,22 @@ export const VerificationWorkbenchPage: React.FC = () => {
                       {activeEvidence.document} · Page {activeEvidence.page}
                     </span>
                     <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-blue-950 text-blue-300 border border-blue-800">
-                      BBox: [{activeEvidence.bbox ? activeEvidence.bbox.map((n) => Math.round(n)).join(", ") : "0, 0, 0, 0"}]
+                      BBox: [{activeEvidence.bbox && activeEvidence.bbox.some((c) => c > 0) ? activeEvidence.bbox.map((n) => Math.round(n)).join(", ") : "None / Unspecified"}]
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
-                      <ShieldCheck className="w-3 h-3 text-emerald-400" />
-                      PHYSICAL EVIDENCE GROUNDED
-                    </span>
+                    {activeEvidence.status === "MISSING" ? (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                        <AlertTriangle className="w-3 h-3 text-rose-400" />
+                        NO BIDDER EVIDENCE SUBMITTED
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800">
+                        <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                        PHYSICAL EVIDENCE GROUNDED
+                      </span>
+                    )}
                     <span className="font-mono text-[11px] font-bold text-amber-400">
                       {activeEvidence.requirement_id}
                     </span>
@@ -501,8 +537,16 @@ export const VerificationWorkbenchPage: React.FC = () => {
                 </div>
 
                 {/* Verbatim Snippet */}
-                <div className="my-1.5 p-2 bg-slate-900 border border-slate-800/90 rounded font-mono text-[11px] text-slate-200 leading-relaxed overflow-y-auto max-h-16">
-                  “{activeEvidence.snippet}”
+                <div className={`my-1.5 p-2 rounded font-mono text-[11px] leading-relaxed overflow-y-auto max-h-16 ${
+                  activeEvidence.status === "MISSING"
+                    ? "bg-rose-950/30 border border-rose-900/60 text-rose-200"
+                    : "bg-slate-900 border border-slate-800/90 text-slate-200"
+                }`}>
+                  {activeEvidence.status === "MISSING" ? (
+                    <span className="italic text-rose-300">{activeEvidence.snippet}</span>
+                  ) : (
+                    <>“{activeEvidence.snippet}”</>
+                  )}
                 </div>
 
                 {/* Traceability Bar */}
@@ -510,9 +554,9 @@ export const VerificationWorkbenchPage: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <span>Threshold: <strong className="text-slate-200">{String(activeEvidence.expected ?? "—")}</strong></span>
                     <span>•</span>
-                    <span>Extracted: <strong className="text-blue-300">{activeEvidence.actual ?? "—"}</strong></span>
+                    <span>Extracted: <strong className={activeEvidence.status === "MISSING" ? "text-rose-400" : "text-blue-300"}>{activeEvidence.actual ?? "—"}</strong></span>
                     <span>•</span>
-                    <span>Verdict: <strong className="text-emerald-400">{activeEvidence.status ?? "EVIDENCE"}</strong></span>
+                    <span>Verdict: <strong className={activeEvidence.status === "PASS" ? "text-emerald-400" : activeEvidence.status === "FAIL" || activeEvidence.status === "MISSING" ? "text-rose-400" : "text-amber-400"}>{activeEvidence.status ?? "EVIDENCE"}</strong></span>
                   </div>
                   <span className="text-slate-500">Step 4 Deterministic Rule Trace</span>
                 </div>

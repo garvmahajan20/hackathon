@@ -97,3 +97,20 @@ class GroundingValidationResult:
     primary_page: int = 1
     primary_bbox: Optional[List[float]] = None
     raw_snippet: str = ""
+
+class LLMProviderError(Exception):
+    """
+    Raised when an LLM provider request fails in LIVE mode,
+    preventing silent fallback to empty results or mock data.
+    """
+    def __init__(
+        self,
+        message: str,
+        provider_name: str = "Unknown",
+        model_name: str = "Unknown",
+        error_detail: Optional[str] = None
+    ):
+        super().__init__(message)
+        self.provider_name = provider_name
+        self.model_name = model_name
+        self.error_detail = error_detail

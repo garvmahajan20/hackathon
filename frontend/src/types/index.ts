@@ -83,6 +83,7 @@ export interface HumanReviewItem {
   evidence_references: any[];
   source_documents: string[];
   source_pages: number[];
+  verification_id?: string | null;
   related_verification_id?: string | null;
   created_at: string;
   status: ReviewItemStatus | string;

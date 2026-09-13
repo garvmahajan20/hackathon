@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
   useReactTable,
@@ -26,9 +26,11 @@ import {
   XCircle,
   Clock3,
   Filter,
+  Loader2,
 } from "lucide-react";
 import { SEEDED_DEMO_VERIFICATIONS } from "../data/demoCases";
 import { SeverityBadge } from "../components/status/StatusBadges";
+import { apiClient } from "../api/client";
 
 interface ReviewRow {
   review_id: string;
@@ -62,19 +64,65 @@ export const ReviewQueuePage: React.FC = () => {
   const [selectedReview, setSelectedReview] = useState<ReviewRow | null>(null);
   const [selectedDecision, setSelectedDecision] = useState<Decision | null>(null);
   const [officerNote, setOfficerNote] = useState("");
-  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  const [liveItems, setLiveItems] = useState<ReviewRow[]>([]);
+  const [isLoadingLive, setIsLoadingLive] = useState<boolean>(true);
+  const [decisions, setDecisions] = useState<Record<string, Decision>>(() => {
+    try {
+      const saved = localStorage.getItem("jarvis_review_decisions");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
-  const rawItems: ReviewRow[] = useMemo(() => SEEDED_DEMO_VERIFICATIONS.flatMap((v) =>
-    v.human_review_items.map((item) => ({
-      ...item,
-      bid_id: v.bid_id,
-      tender_id: v.tender_id,
-      verification_id: v.verification_id,
-      evidence_references: item.evidence_references || [],
-      source_documents: item.source_documents.length > 0 ? item.source_documents : [`${v.bid_id}.pdf`],
-    })),
-  ), []);
+  useEffect(() => {
+    apiClient
+      .getReviewQueue()
+      .then((items) => {
+        const formatted: ReviewRow[] = (items || []).map((item: any) => ({
+          review_id: item.review_id,
+          bid_id: item.bid_id || "BID-UNKNOWN",
+          tender_id: item.tender_id || "TENDER-UNKNOWN",
+          verification_id: item.verification_id || (item.related_verification_id && !item.related_verification_id.includes("-REQ-") ? item.related_verification_id : `VERIF-${item.tender_id || 'TND'}-${item.bid_id || 'BID'}`),
+          category: item.category || "MANUAL_INSPECTION",
+          severity: item.severity || "MEDIUM",
+          reason: item.reason || "",
+          evidence_references: item.evidence_references || [],
+          source_documents: item.source_documents && item.source_documents.length > 0 ? item.source_documents : [`${item.bid_id || "bid"}.pdf`],
+          source_pages: item.source_pages && item.source_pages.length > 0 ? item.source_pages : [1],
+          created_at: item.created_at || "",
+          status: item.status || "OPEN",
+        }));
+        setLiveItems(formatted);
+      })
+      .catch((err) => {
+        console.warn("Could not fetch remote review queue, relying on cached / seeded:", err);
+      })
+      .finally(() => {
+        setIsLoadingLive(false);
+      });
+  }, []);
+
+  const rawItems: ReviewRow[] = useMemo(() => {
+    const seededRows: ReviewRow[] = SEEDED_DEMO_VERIFICATIONS.flatMap((v) =>
+      v.human_review_items.map((item) => ({
+        ...item,
+        bid_id: v.bid_id,
+        tender_id: v.tender_id,
+        verification_id: v.verification_id,
+        evidence_references: item.evidence_references || [],
+        source_documents: item.source_documents && item.source_documents.length > 0 ? item.source_documents : [`${v.bid_id}.pdf`],
+        source_pages: item.source_pages && item.source_pages.length > 0 ? item.source_pages : [1],
+      }))
+    );
+
+    const liveIds = new Set(liveItems.map((r) => r.review_id));
+    const uniqueSeeded = seededRows.filter((r) => !liveIds.has(r.review_id));
+
+    // Live uploaded verifications strictly placed AT THE TOP, followed by seeded demo records
+    return [...liveItems, ...uniqueSeeded];
+  }, [liveItems]);
 
   const filteredData = useMemo(() => rawItems.filter((r) => {
     const categoryMatch = categoryFilter === "ALL" || r.category === categoryFilter;
@@ -96,7 +144,15 @@ export const ReviewQueuePage: React.FC = () => {
 
   const recordDecision = () => {
     if (!selectedReview || !selectedDecision) return;
-    setDecisions((prev) => ({ ...prev, [selectedReview.review_id]: selectedDecision }));
+    setDecisions((prev) => {
+      const next = { ...prev, [selectedReview.review_id]: selectedDecision };
+      try {
+        localStorage.setItem("jarvis_review_decisions", JSON.stringify(next));
+      } catch (e) {
+        // ignore
+      }
+      return next;
+    });
     setSavedMessage(`${decisionMeta[selectedDecision].label} recorded for ${selectedReview.review_id}.`);
     setOfficerNote("");
   };
