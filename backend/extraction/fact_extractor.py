@@ -42,6 +42,7 @@ class LLMBidderFactExtractor(BaseFactExtractor):
         self.mode = mode
         self.validator = schema_validator or SchemaValidator()
         self.strict_grounding = strict_grounding if strict_grounding is not None else (mode != LLMMode.MOCK)
+        self.last_extraction_source: str = "FRESH" if self.mode == LLMMode.LIVE else ("MOCK" if getattr(self.provider, "is_mock", False) else "CACHED")
 
     def extract_facts(
         self,
@@ -63,10 +64,12 @@ class LLMBidderFactExtractor(BaseFactExtractor):
         )
 
         response_text = ""
-        if self.mode == LLMMode.CACHED or (self.mode == LLMMode.LIVE and self.cache.has(cache_key)):
+        is_from_cache = False
+        if self.cache.should_read_cache(self.mode) and self.cache.has(cache_key):
             cached_resp = self.cache.get(cache_key)
-            if cached_resp:
+            if cached_resp and cached_resp.content:
                 response_text = cached_resp.content
+                is_from_cache = True
 
         if not response_text:
             resp = self.provider.generate_structured(
@@ -85,6 +88,15 @@ class LLMBidderFactExtractor(BaseFactExtractor):
             response_text = resp.content
             if self.mode == LLMMode.LIVE and not resp.is_mock:
                 self.cache.set(cache_key, resp)
+
+        if self.mode == LLMMode.MOCK:
+            self.last_extraction_source = "MOCK"
+        elif self.mode == LLMMode.LIVE:
+            self.last_extraction_source = "FRESH"
+        elif is_from_cache:
+            self.last_extraction_source = "CACHED"
+        else:
+            self.last_extraction_source = "FRESH"
 
         candidate_facts = self._parse_candidates(response_text)
         validated_facts: List[BidderFact] = []

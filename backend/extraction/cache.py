@@ -1,4 +1,5 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
+from enum import Enum
 import hashlib
 import json
 import os
@@ -6,15 +7,32 @@ from typing import Any, Dict, Optional
 
 from .models import LLMProviderResponse
 
+class CachePolicy(str, Enum):
+    BYPASS_CACHE = "BYPASS_CACHE"
+    USE_CACHE = "USE_CACHE"
+    DISABLED = "DISABLED"
+
 class LLMCache:
     """
     Deterministic disk cache for LLM extraction requests.
-    Prevents repeated expensive API invocations during demos and regression runs.
+    Enforces live-cache policy:
+    - LIVE: BYPASS_CACHE (fresh API calls, never read existing cache entries)
+    - CACHED: USE_CACHE (allowed to read existing cache entries)
+    - MOCK: DISABLED (mock provider)
     """
 
     def __init__(self, cache_dir: str = "data/cache/llm"):
         self.cache_dir = cache_dir
         os.makedirs(self.cache_dir, exist_ok=True)
+
+    def should_read_cache(self, mode: Any) -> bool:
+        """
+        Determines whether extraction is allowed to read from disk cache.
+        LIVE mode ALWAYS returns False (bypasses cache completely).
+        CACHED mode returns True.
+        """
+        mode_str = mode.value if hasattr(mode, "value") else str(mode).upper()
+        return mode_str == "CACHED"
 
     def generate_cache_key(
         self,

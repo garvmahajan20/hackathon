@@ -59,6 +59,7 @@ class TenderRequirementExtractor:
         self.mode = mode
         self.validator = schema_validator or SchemaValidator()
         self.two_pass = two_pass
+        self.last_extraction_source: str = "FRESH" if self.mode == LLMMode.LIVE else ("MOCK" if getattr(self.provider, "is_mock", False) else "CACHED")
 
     def extract_requirements(
         self,
@@ -163,10 +164,12 @@ class TenderRequirementExtractor:
         )
 
         response_text = ""
-        if self.mode == LLMMode.CACHED or (self.mode == LLMMode.LIVE and self.cache.has(cache_key)):
+        is_from_cache = False
+        if self.cache.should_read_cache(self.mode) and self.cache.has(cache_key):
             cached_resp = self.cache.get(cache_key)
-            if cached_resp:
+            if cached_resp and cached_resp.content:
                 response_text = cached_resp.content
+                is_from_cache = True
 
         if not response_text:
             resp = self.provider.generate_structured(
@@ -186,6 +189,15 @@ class TenderRequirementExtractor:
             if self.mode == LLMMode.LIVE and not resp.is_mock:
                 self.cache.set(cache_key, resp)
 
+        if self.mode == LLMMode.MOCK:
+            self.last_extraction_source = "MOCK"
+        elif self.mode == LLMMode.LIVE:
+            self.last_extraction_source = "FRESH"
+        elif is_from_cache:
+            self.last_extraction_source = "CACHED"
+        else:
+            self.last_extraction_source = "FRESH"
+
         return self._parse_candidates(response_text)
 
     def _extract_two_pass(
@@ -194,6 +206,7 @@ class TenderRequirementExtractor:
         extraction_result: ExtractionResult
     ) -> List[CandidateRequirement]:
         raw_candidates: List[CandidateRequirement] = []
+        p1_cached_any = False
 
         # PASS 1: Page-aware exhaustive procurement condition discovery
         for page in extraction_result.pages:
@@ -205,10 +218,11 @@ class TenderRequirementExtractor:
                 prompt_content=p1_prompt,
             )
             p1_text = ""
-            if self.mode == LLMMode.CACHED or (self.mode == LLMMode.LIVE and self.cache.has(p1_cache_key)):
+            if self.cache.should_read_cache(self.mode) and self.cache.has(p1_cache_key):
                 cached_resp = self.cache.get(p1_cache_key)
-                if cached_resp:
+                if cached_resp and cached_resp.content:
                     p1_text = cached_resp.content
+                    p1_cached_any = True
 
             if not p1_text:
                 resp = self.provider.generate_structured(
@@ -244,10 +258,12 @@ class TenderRequirementExtractor:
             prompt_content=p2_prompt,
         )
         p2_text = ""
-        if self.mode == LLMMode.CACHED or (self.mode == LLMMode.LIVE and self.cache.has(p2_cache_key)):
+        p2_cached = False
+        if self.cache.should_read_cache(self.mode) and self.cache.has(p2_cache_key):
             cached_resp = self.cache.get(p2_cache_key)
-            if cached_resp:
+            if cached_resp and cached_resp.content:
                 p2_text = cached_resp.content
+                p2_cached = True
 
         if not p2_text:
             resp_p2 = self.provider.generate_structured(
@@ -271,6 +287,15 @@ class TenderRequirementExtractor:
         if p2_text:
             pass2_candidates = self._parse_candidates(p2_text, default_source_pass="PASS_2_BIDDER_OBLIGATION")
             raw_candidates.extend(pass2_candidates)
+
+        if self.mode == LLMMode.MOCK:
+            self.last_extraction_source = "MOCK"
+        elif self.mode == LLMMode.LIVE:
+            self.last_extraction_source = "FRESH"
+        elif p1_cached_any or p2_cached:
+            self.last_extraction_source = "CACHED"
+        else:
+            self.last_extraction_source = "FRESH"
 
         return raw_candidates
 

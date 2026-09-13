@@ -188,7 +188,9 @@ class VerificationOrchestrator:
 
             # --- STEP 3: Candidate Parameter Extraction ---
             current_step = 3
-            notify_progress(3, "RUNNING", "Extracting compliance requirements and bidder claims...")
+            extraction_mode_label = self.mode.value if hasattr(self.mode, 'value') else str(self.mode)
+            cache_policy_label = "BYPASS_CACHE" if self.mode == LLMMode.LIVE else ("USE_CACHE" if self.mode == LLMMode.CACHED else "DISABLED")
+            notify_progress(3, "RUNNING", f"Extracting compliance requirements and bidder claims ({extraction_mode_label} mode, cache policy: {cache_policy_label})...")
 
             requirements = self.requirement_extractor.extract_requirements(t_ingest_res, tender_id=tender_id)
 
@@ -198,9 +200,22 @@ class VerificationOrchestrator:
                 facts = self.fact_extractor.extract_facts(b_ingest_res, bid_id=bid_id)
                 all_facts.extend(facts)
 
-            notify_progress(3, "COMPLETED", f"Extracted {len(requirements)} requirement(s) and {len(all_facts)} bidder fact parameter(s).", {
+            req_source = getattr(self.requirement_extractor, "last_extraction_source", "MOCK" if self.mode == LLMMode.MOCK else ("FRESH" if self.mode == LLMMode.LIVE else "CACHED"))
+            fact_source = getattr(self.fact_extractor, "last_extraction_source", "MOCK" if self.mode == LLMMode.MOCK else ("FRESH" if self.mode == LLMMode.LIVE else "CACHED"))
+            if self.mode == LLMMode.MOCK:
+                extraction_source = "MOCK"
+            elif self.mode == LLMMode.LIVE:
+                extraction_source = "FRESH"
+            else:
+                extraction_source = "CACHED" if (req_source == "CACHED" or fact_source == "CACHED") else "FRESH"
+
+            notify_progress(3, "COMPLETED", f"Extracted {len(requirements)} requirement(s) and {len(all_facts)} bidder fact parameter(s) [{extraction_source}].", {
                 "requirements_count": len(requirements),
                 "facts_count": len(all_facts),
+                "extraction_source": extraction_source,
+                "requirement_source": req_source,
+                "fact_source": fact_source,
+                "cache_policy": cache_policy_label,
             })
 
             # --- STEP 4: Deterministic Compliance Evaluation ---
@@ -324,6 +339,10 @@ class VerificationOrchestrator:
                 "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
                 "model": self.provider.model_name,
                 "latency_ms": total_time_ms,
+                "extraction_source": extraction_source,
+                "cache_policy": cache_policy_label,
+                "requirement_source": req_source,
+                "fact_source": fact_source,
             }
 
             aggregated = self.aggregator.aggregate(
