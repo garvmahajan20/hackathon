@@ -23,6 +23,7 @@ class GeminiProvider(BaseLLMProvider):
         max_retries: int = 2,
         timeout_seconds: int = 30
     ):
+        super().__init__()
         if api_key is None:
             if "GEMINI_API_KEY" not in os.environ:
                 try:
@@ -159,6 +160,7 @@ class GeminiProvider(BaseLLMProvider):
         # 1. Primary Model Attempt
         res = self._execute_request(self._model_name, payload)
         if not res.error:
+            self.record_call(res)
             return res
 
         # 2. Resilient Fallback Cascade (on 404, 503, or 429 quota exhaustion)
@@ -168,6 +170,8 @@ class GeminiProvider(BaseLLMProvider):
                 if fallback_m and fallback_m != self._model_name:
                     fallback_res = self._execute_request(fallback_m, payload)
                     if not fallback_res.error:
+                        self.record_call(fallback_res)
                         return fallback_res
 
+        self.record_call(res)
         return res

@@ -19,6 +19,7 @@ class MockLLMProvider(BaseLLMProvider):
         canned_error: Optional[str] = None,
         custom_handler: Optional[Callable[[str], str]] = None
     ):
+        super().__init__()
         self._canned_response = canned_response
         self._canned_error = canned_error
         self._custom_handler = custom_handler
@@ -44,16 +45,18 @@ class MockLLMProvider(BaseLLMProvider):
         **kwargs: Any
     ) -> LLMProviderResponse:
         if self._canned_error:
-            return LLMProviderResponse(
+            res = LLMProviderResponse(
                 content="",
                 model_name=self.model_name,
                 error=self._canned_error,
                 is_mock=True,
                 is_cached=False,
             )
+            self.record_call(res)
+            return res
 
         if self._canned_response is not None:
-            return LLMProviderResponse(
+            res = LLMProviderResponse(
                 content=self._canned_response,
                 model_name=self.model_name,
                 prompt_tokens=len(prompt) // 4,
@@ -62,10 +65,12 @@ class MockLLMProvider(BaseLLMProvider):
                 is_mock=True,
                 is_cached=False,
             )
+            self.record_call(res)
+            return res
 
         if self._custom_handler:
             out = self._custom_handler(prompt)
-            return LLMProviderResponse(
+            res = LLMProviderResponse(
                 content=out,
                 model_name=self.model_name,
                 prompt_tokens=len(prompt) // 4,
@@ -74,25 +79,31 @@ class MockLLMProvider(BaseLLMProvider):
                 is_mock=True,
                 is_cached=False,
             )
+            self.record_call(res)
+            return res
 
         # Dynamic mock logic based on prompt content
         # Check if bidder facts or tender requirements are requested
         if "BIDDER FACT EXTRACTION" in prompt or "bidder fact" in prompt.lower():
             facts = self._generate_mock_bidder_facts(prompt)
-            return LLMProviderResponse(
+            res = LLMProviderResponse(
                 content=json.dumps({"facts": facts}),
                 model_name=self.model_name,
                 is_mock=True,
                 latency_ms=1.0,
             )
+            self.record_call(res)
+            return res
         else:
             reqs = self._generate_mock_tender_requirements(prompt)
-            return LLMProviderResponse(
+            res = LLMProviderResponse(
                 content=json.dumps({"requirements": reqs}),
                 model_name=self.model_name,
                 is_mock=True,
                 latency_ms=1.0,
             )
+            self.record_call(res)
+            return res
 
     def _find_block_for_keyword(self, blocks: List[tuple], keywords: List[str]) -> Optional[str]:
         for b_id, b_text in blocks:

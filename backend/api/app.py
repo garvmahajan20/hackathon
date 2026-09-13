@@ -278,9 +278,14 @@ async def verify_bid_stream(
                 company_name_hint=company_name,
                 progress_callback=sync_progress_callback,
             )
+            diag = (aggregated.processing_metadata or {}).get("diagnostic_telemetry", {})
             loop.call_soon_threadsafe(
                 queue.put_nowait,
-                {"event": "VERIFICATION_COMPLETED", "result": aggregated.to_dict()},
+                {
+                    "event": "VERIFICATION_COMPLETED",
+                    "result": aggregated.to_dict(),
+                    "meta": {"diagnostic_telemetry": diag},
+                },
             )
         except LLMProviderError as lpe:
             loop.call_soon_threadsafe(

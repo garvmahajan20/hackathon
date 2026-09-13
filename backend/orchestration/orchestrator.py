@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import hashlib
 import json
 import logging
@@ -145,7 +146,9 @@ class VerificationOrchestrator:
                     model_name=self.provider.model_name,
                 )
 
+            request_start_timestamp = datetime.now(timezone.utc).isoformat()
             t0 = time.perf_counter()
+            initial_provider_calls = getattr(self.provider, "call_count", 0)
 
             # 1. Infer Identifiers if not provided
             t_base = os.path.basename(tender_document_path)
@@ -188,17 +191,27 @@ class VerificationOrchestrator:
 
             # --- STEP 3: Candidate Parameter Extraction ---
             current_step = 3
+            stage3_start_timestamp = datetime.now(timezone.utc).isoformat()
+            t_stage3_start = time.perf_counter()
+            calls_before_req = getattr(self.provider, "call_count", 0)
+
             extraction_mode_label = self.mode.value if hasattr(self.mode, 'value') else str(self.mode)
             cache_policy_label = "BYPASS_CACHE" if self.mode == LLMMode.LIVE else ("USE_CACHE" if self.mode == LLMMode.CACHED else "DISABLED")
             notify_progress(3, "RUNNING", f"Extracting compliance requirements and bidder claims ({extraction_mode_label} mode, cache policy: {cache_policy_label})...")
 
             requirements = self.requirement_extractor.extract_requirements(t_ingest_res, tender_id=tender_id)
+            tender_req_calls = getattr(self.provider, "call_count", 0) - calls_before_req
 
+            calls_before_facts = getattr(self.provider, "call_count", 0)
             all_facts: List[BidderFact] = []
             grounding_warnings: List[str] = []
             for b_path, b_ingest_res in bid_ingest_results:
                 facts = self.fact_extractor.extract_facts(b_ingest_res, bid_id=bid_id)
                 all_facts.extend(facts)
+            bidder_fact_calls = getattr(self.provider, "call_count", 0) - calls_before_facts
+
+            stage3_end_timestamp = datetime.now(timezone.utc).isoformat()
+            stage3_elapsed_ms = (time.perf_counter() - t_stage3_start) * 1000.0
 
             req_source = getattr(self.requirement_extractor, "last_extraction_source", "MOCK" if self.mode == LLMMode.MOCK else ("FRESH" if self.mode == LLMMode.LIVE else "CACHED"))
             fact_source = getattr(self.fact_extractor, "last_extraction_source", "MOCK" if self.mode == LLMMode.MOCK else ("FRESH" if self.mode == LLMMode.LIVE else "CACHED"))
@@ -216,13 +229,21 @@ class VerificationOrchestrator:
                 "requirement_source": req_source,
                 "fact_source": fact_source,
                 "cache_policy": cache_policy_label,
+                "stage3_elapsed_ms": stage3_elapsed_ms,
+                "tender_req_calls": tender_req_calls,
+                "bidder_fact_calls": bidder_fact_calls,
             })
 
             # --- STEP 4: Deterministic Compliance Evaluation ---
             current_step = 4
+            stage4_start_timestamp = datetime.now(timezone.utc).isoformat()
+            t_stage4_start = time.perf_counter()
             notify_progress(4, "RUNNING", "Evaluating deterministic compliance rules against extracted facts...")
 
             compliance_results = self.rule_engine.verify_bid(requirements, all_facts)
+            stage4_end_timestamp = datetime.now(timezone.utc).isoformat()
+            stage4_elapsed_ms = (time.perf_counter() - t_stage4_start) * 1000.0
+
             pass_eval_count = sum(1 for c in compliance_results if getattr(c.status, "value", str(c.status)) == "PASS")
             fail_eval_count = sum(1 for c in compliance_results if getattr(c.status, "value", str(c.status)) == "FAIL")
 
@@ -230,6 +251,7 @@ class VerificationOrchestrator:
                 "evaluated_count": len(compliance_results),
                 "pass_count": pass_eval_count,
                 "fail_count": fail_eval_count,
+                "stage4_elapsed_ms": stage4_elapsed_ms,
             })
 
             # --- STEP 5: Contradictions & Government Registries ---
@@ -334,7 +356,43 @@ class VerificationOrchestrator:
             current_step = 6
             notify_progress(6, "RUNNING", "Aggregating compliance scores and compiling cryptographically sealed audit dossier...")
 
-            total_time_ms = (time.perf_counter() - t0) * 1000.0
+            t_end = time.perf_counter()
+            total_time_ms = (t_end - t0) * 1000.0
+            request_end_timestamp = datetime.now(timezone.utc).isoformat()
+            total_gemini_calls = getattr(self.provider, "call_count", 0) - initial_provider_calls
+
+            # Check whether every provider call in this run was FRESH
+            provider_call_history = getattr(self.provider, "call_history", [])
+            recent_calls = provider_call_history[-total_gemini_calls:] if total_gemini_calls > 0 else []
+            if self.mode == LLMMode.MOCK:
+                all_calls_fresh = False
+            elif self.mode == LLMMode.CACHED:
+                all_calls_fresh = False
+            elif self.mode == LLMMode.LIVE:
+                all_calls_fresh = total_gemini_calls > 0 and all(
+                    (not c.get("is_cached")) and (not c.get("is_mock")) for c in recent_calls
+                )
+            else:
+                all_calls_fresh = False
+
+            diagnostic_telemetry = {
+                "request_start_timestamp": request_start_timestamp,
+                "request_end_timestamp": request_end_timestamp,
+                "total_backend_elapsed_ms": round(total_time_ms, 2),
+                "number_of_gemini_provider_calls": total_gemini_calls,
+                "tender_requirement_gemini_call_count": tender_req_calls,
+                "bidder_fact_gemini_call_count": bidder_fact_calls,
+                "whether_every_call_was_fresh": all_calls_fresh,
+                "verification_id": f"VERIF-{tender_id}-{bid_id}",
+                "stage3_start_timestamp": stage3_start_timestamp,
+                "stage3_end_timestamp": stage3_end_timestamp,
+                "stage3_elapsed_ms": round(stage3_elapsed_ms, 2),
+                "stage4_start_timestamp": stage4_start_timestamp,
+                "stage4_end_timestamp": stage4_end_timestamp,
+                "stage4_elapsed_ms": round(stage4_elapsed_ms, 2),
+                "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
+            }
+
             extraction_meta = {
                 "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
                 "model": self.provider.model_name,
@@ -343,6 +401,7 @@ class VerificationOrchestrator:
                 "cache_policy": cache_policy_label,
                 "requirement_source": req_source,
                 "fact_source": fact_source,
+                "diagnostic_telemetry": diagnostic_telemetry,
             }
 
             aggregated = self.aggregator.aggregate(
@@ -355,6 +414,40 @@ class VerificationOrchestrator:
                 extraction_metadata=extraction_meta,
                 requirements=requirements,
                 facts=all_facts,
+            )
+
+            diagnostic_telemetry["verification_id"] = aggregated.verification_id
+
+            logger.info(
+                "\n================================================================================\n"
+                "LIVE VERIFICATION DIAGNOSTIC TELEMETRY (POST /api/v1/verify-stream)\n"
+                "================================================================================\n"
+                "1. Request Start Timestamp:            %s\n"
+                "2. Request End Timestamp:              %s\n"
+                "3. Total Backend Elapsed Milliseconds: %.2f ms (%.3f s)\n"
+                "4. Number of Gemini Provider Calls:    %d\n"
+                "5. Tender Requirement Gemini Calls:    %d\n"
+                "6. Bidder Fact Gemini Calls:           %d\n"
+                "7. Whether Every Call Was FRESH:       %s\n"
+                "8. Verification ID:                    %s\n"
+                "9. Stage 3 Start/End Timestamps:       %s -> %s (%.2f ms)\n"
+                "10. Stage 4 Start/End Timestamps:      %s -> %s (%.2f ms)\n"
+                "================================================================================",
+                diagnostic_telemetry["request_start_timestamp"],
+                diagnostic_telemetry["request_end_timestamp"],
+                diagnostic_telemetry["total_backend_elapsed_ms"],
+                diagnostic_telemetry["total_backend_elapsed_ms"] / 1000.0,
+                diagnostic_telemetry["number_of_gemini_provider_calls"],
+                diagnostic_telemetry["tender_requirement_gemini_call_count"],
+                diagnostic_telemetry["bidder_fact_gemini_call_count"],
+                diagnostic_telemetry["whether_every_call_was_fresh"],
+                diagnostic_telemetry["verification_id"],
+                diagnostic_telemetry["stage3_start_timestamp"],
+                diagnostic_telemetry["stage3_end_timestamp"],
+                diagnostic_telemetry["stage3_elapsed_ms"],
+                diagnostic_telemetry["stage4_start_timestamp"],
+                diagnostic_telemetry["stage4_end_timestamp"],
+                diagnostic_telemetry["stage4_elapsed_ms"],
             )
 
             dossier = self._generate_dossier(
@@ -380,6 +473,7 @@ class VerificationOrchestrator:
                 "verification_id": aggregated.verification_id,
                 "overall_status": aggregated.overall_status,
                 "compliance_score": aggregated.compliance_score,
+                "diagnostic_telemetry": diagnostic_telemetry,
             })
 
             return aggregated, dossier
