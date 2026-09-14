@@ -412,8 +412,9 @@ export const VerificationWorkbenchPage: React.FC = () => {
 
   const passCount = bidderResults.filter((r) => r.status === "PASS").length;
   const failCount = bidderResults.filter((r) => r.status === "FAIL").length;
-  const reviewCount = verification.human_review_items.length;
+  const reviewCount = bidderResults.filter((r) => r.status === "REVIEW" || r.status === "PARTIAL").length;
   const missingCount = bidderResults.filter((r) => r.status === "MISSING").length;
+  const officerQueueCount = verification.human_review_items.length;
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] space-y-2.5 font-sans select-none">
@@ -490,6 +491,11 @@ export const VerificationWorkbenchPage: React.FC = () => {
           <div className="border-l border-slate-200 pl-4">
             <span className="text-amber-600 mr-1 font-bold">◆ REVIEW:</span>
             <span className="font-bold text-amber-800">{reviewCount}</span>
+          </div>
+
+          <div className="border-l border-slate-200 pl-4">
+            <span className="text-purple-600 mr-1 font-bold">📋 QUEUE:</span>
+            <span className="font-bold text-purple-800">{officerQueueCount}</span>
           </div>
 
           <div className="border-l border-slate-200 pl-4">

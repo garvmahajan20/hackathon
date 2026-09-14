@@ -73,9 +73,28 @@ def normalize_numeric(value: Any, default_unit: Optional[str] = None) -> Tuple[O
     # Strip standard procurement qualifier phrases
     cleaned = re.sub(r"\b(of\s+bid\s+quantity|of\s+contract\s+value|of\s+bid\s+value|of\s+total\s+value|of\s+quantity)\b", "", cleaned).strip()
 
+    # Strip unit nouns / duration nouns if present
+    if re.search(r"\b(units?|nos?|pieces?|pcs?|devices?|items?)\b", cleaned):
+        detected_unit = detected_unit or "COUNT"
+        cleaned = re.sub(r"\b(units?|nos?|pieces?|pcs?|devices?|items?)\b", "", cleaned).strip()
+    elif re.search(r"\b(days?|d)\b", cleaned):
+        detected_unit = detected_unit or "DAYS"
+        cleaned = re.sub(r"\b(days?|d)\b", "", cleaned).strip()
+    elif re.search(r"\b(months?|mths?|mth|mo)\b", cleaned):
+        detected_unit = detected_unit or "MONTHS"
+        cleaned = re.sub(r"\b(months?|mths?|mth|mo)\b", "", cleaned).strip()
+    elif re.search(r"\b(years?|yrs?|yr)\b", cleaned):
+        detected_unit = detected_unit or "YEARS"
+        cleaned = re.sub(r"\b(years?|yrs?|yr)\b", "", cleaned).strip()
+
     # Check if remaining string has non-currency alphabetic characters (e.g. ISO 9001:2015, Grade A)
     # If so, it is an alphanumeric code or categorical string, not a pure numeric value
-    remaining_text = re.sub(r"[?$]|\b(rs\.?|inr|rupees|crores?|crs?|lakhs?|lacs?|millions?|thousands?|k|m|cr)\b", "", cleaned).strip()
+    remaining_text = re.sub(
+        r"[?$]|\b(rs\.?|inr|rupees|crores?|crs?|lakhs?|lacs?|millions?|thousands?|k|m|cr|"
+        r"units?|nos?|pieces?|pcs?|devices?|items?|days?|months?|years?|hrs?|hours?)\b",
+        "",
+        cleaned
+    ).strip()
     if re.search(r"[a-zA-Z]", remaining_text):
         return None, default_unit
 

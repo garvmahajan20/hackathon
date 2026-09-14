@@ -50,8 +50,24 @@ def classify_requirement_scope(
     combined_norm = re.sub(r"[\s\-_]+", " ", combined)
 
     # 0. Umbrella document containers (parent tables decomposed into child requirements)
-    if fld_clean in ("required_documents", "mandatory_documents", "seller_documents"):
+    if fld_clean in (
+        "required_documents", "mandatory_documents", "seller_documents",
+        "document_required_from_seller", "documents_required_from_seller",
+        "document_required", "documents_required"
+    ) or any(u in combined_norm for u in [
+        "document required from seller", "documents required from seller",
+        "document requested from seller", "documents requested from seller"
+    ]):
         return "INFORMATIONAL"
+
+    # 0B. Buyer-side evaluation procedures (actions performed by buyer, not bidder submissions)
+    buyer_eval_markers = [
+        "to be verified by the buyer", "verified by the buyer", "verified by buyer",
+        "buyer at the time of technical evaluation", "evaluated by the buyer",
+        "buyer evaluation", "verification by buyer"
+    ]
+    if any(m in combined_norm for m in buyer_eval_markers):
+        return "PROCESS_CONDITION"
 
     # 1. Actionable bidder obligation markers (action verbs, submission nouns, compliance verbs)
     actionable_markers = [
@@ -97,9 +113,11 @@ def classify_requirement_scope(
         "inspection required", "price margin", "purchase preference price margin",
         "purchase preference quantity", "purchase preference max percentage",
         "purchase preference enabled", "price match margin", "payment on delivery",
-        "cost allocation percentage", "completion days after site readiness",
-        "atc contravention rule", "tie breaking mechanism", "false declaration penalty",
-        "bunch bid", "bunch bids", "mse purchase preference", "purchase preference"
+        "cost allocation percentage", "cost allocation for ict", "cost allocation",
+        "completion days after site readiness", "site readiness communication", "site readiness",
+        "days allowed for ict", "atc contravention rule", "tie breaking mechanism",
+        "false declaration penalty", "bunch bid", "bunch bids", "mse purchase preference",
+        "purchase preference"
     ]
     if any(k in combined_norm for k in process_keywords) and not has_actionable_marker:
         return "PROCESS_CONDITION"
@@ -110,7 +128,9 @@ def classify_requirement_scope(
         "traders and resellers are excluded", "traders excluded", "traders are not eligible",
         "trader eligibility", "arbitration", "mediation", "null and void", "null & void",
         "service level agreement", "sla conditions", "sla terms", "breach of contract",
-        "pre existing labour laws", "pre-existing labour laws", "precedence of terms",
+        "pre existing labour laws", "pre-existing labour laws", "pre-existing labour enactments",
+        "pre existing labour enactments", "applicable labour laws", "labour law compliance",
+        "labour codes", "statutory labour codes", "precedence of terms",
         "custom boq bid restriction", "brand mandate restriction", "expired suspension",
         "physical document submission", "procurement of works", "cross procurement type",
         "sample trial policy", "experience restriction", "category selection",

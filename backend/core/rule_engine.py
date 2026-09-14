@@ -1,5 +1,7 @@
+import re
 from collections import defaultdict
 from datetime import date
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from .models import (
@@ -244,13 +246,46 @@ class DeterministicRuleEngine:
             expected_val = req.normalized_expected_value if req.normalized_expected_value is not None else req.expected_value
 
             # If canonical field is DELIVERY_PERIOD or unit is DAYS, ensure duration normalization
-            if req.canonical_field == "DELIVERY_PERIOD" or req.unit == "DAYS" or getattr(fact, "canonical_field", "") == "DELIVERY_PERIOD":
+            is_delivery = (
+                req.canonical_field == "DELIVERY_PERIOD"
+                or req.unit == "DAYS"
+                or getattr(fact, "canonical_field", "") == "DELIVERY_PERIOD"
+                or "delivery" in (req.field or "").lower()
+            )
+            op_to_use = req.operator
+            if is_delivery:
                 exp_dur, _ = normalize_duration(req.expected_value, target_unit="DAYS")
                 if exp_dur is not None:
                     expected_val = int(exp_dur)
                 act_dur, _ = normalize_duration(actual_val, target_unit="DAYS")
                 if act_dur is not None:
                     actual_val = int(act_dur)
+                # In procurement contracts, delivery schedule represents an upper bound (maximum completion days).
+                # Offering earlier delivery (e.g. 45 days vs 60 days required) satisfies the contract schedule.
+                if req.operator in (OperatorType.EQ.value, "==") and actual_val is not None and expected_val is not None:
+                    op_to_use = OperatorType.LTE.value
+
+            # If canonical field is PAST_PERFORMANCE_PERCENT:
+            # Handle possible unit mismatch between percentage (e.g. 80%) and count (e.g. 450 Units)
+            is_past_perf = (
+                req.canonical_field == "PAST_PERFORMANCE_PERCENT"
+                or getattr(fact, "canonical_field", "") == "PAST_PERFORMANCE_PERCENT"
+                or "past performance" in (req.field or "").lower()
+            )
+            if is_past_perf:
+                fact_text = f"{fact.value} {getattr(fact, 'raw_text_snippet', '') or ''}"
+                pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", fact_text)
+                req_pct_match = re.search(r"(\d+(?:\.\d+)?)\s*%", str(req.expected_value))
+                if pct_match and req_pct_match:
+                    actual_val = Decimal(pct_match.group(1))
+                    expected_val = Decimal(req_pct_match.group(1))
+                elif req_pct_match:
+                    act_num, _ = normalize_numeric(actual_val)
+                    if act_num is not None:
+                        total_qty = self._find_tender_total_quantity(precedence_res.all_requirements)
+                        if total_qty and total_qty > 0:
+                            actual_val = (act_num / total_qty) * Decimal("100")
+                            expected_val = Decimal(req_pct_match.group(1))
 
             # If operator is VALID_ON, pass reference date as expected
             if req.operator == OperatorType.VALID_ON.value:
@@ -282,7 +317,7 @@ class DeterministicRuleEngine:
                 )
                 continue
 
-            op_result = evaluate_operator(req.operator, actual_val, expected_val, req.field or "")
+            op_result = evaluate_operator(op_to_use, actual_val, expected_val, req.field or "")
 
             # Assemble evidence pointer(s) preserving multi-block provenance
             evidence_list = []
@@ -350,6 +385,19 @@ class DeterministicRuleEngine:
 
         return results
 
+    def _find_tender_total_quantity(self, requirements: List[TenderRequirement]) -> Optional[Decimal]:
+        for r in requirements:
+            rf = (r.field or "").lower()
+            if rf in ("total_quantity", "quantity", "total_bid_quantity", "bid_quantity"):
+                val, _ = normalize_numeric(r.expected_value)
+                if val and val > 0:
+                    return val
+            desc = (r.description or "").lower()
+            q_match = re.search(r"\b(?:for|schedule for|quantity[:\s]+)(\d+)\s*(?:units?|nos?|devices?)", desc)
+            if q_match:
+                return Decimal(q_match.group(1))
+        return None
+
     def _check_exemption_status(
         self,
         facts_by_field: Dict[str, List[BidderFact]],
@@ -389,7 +437,11 @@ class DeterministicRuleEngine:
         # 1. MSE Exemption
         req_type = getattr(req, "requirement_type", "BIDDER_COMPLIANCE")
         req_field_clean = (req.field or "").lower()
-        is_emd_deposit_req = req_field_clean == "emd_amount" or getattr(req, "canonical_field", "") == "EMD_AMOUNT"
+        is_emd_deposit_req = (
+            req_field_clean in ("emd_amount", "emd_exemption_policy", "emd_policy", "emd_exemption", "emd_status", "emd_requirement")
+            or getattr(req, "canonical_field", "") in ("EMD_AMOUNT", "EMD_REQUIREMENT")
+            or "emd" in req_field_clean
+        )
         mse_allowed = applicability.get("mse_exemption_allowed") or is_emd_deposit_req
         if mse_allowed and "proof" not in req_field_clean:
             if is_mse is True:
