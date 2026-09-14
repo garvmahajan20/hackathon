@@ -3,9 +3,11 @@ import hashlib
 import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 import threading
+import uuid
 from typing import Any, Dict, List, Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile, status
@@ -42,14 +44,25 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Enable CORS for future frontend dashboard
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Enable CORS for frontend dashboard and API clients
+cors_origins_env = os.environ.get("CORS_ORIGINS")
+if cors_origins_env:
+    origins = [o.strip() for o in cors_origins_env.split(",") if o.strip()]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 from .digilocker_router import router as digilocker_router
 app.include_router(digilocker_router)
@@ -116,7 +129,7 @@ async def health_check():
 def _validate_and_save_file(upload_file: UploadFile, target_dir: str) -> str:
     # 1. Filename & Path Traversal Validation
     raw_name = upload_file.filename or "document.pdf"
-    if ".." in raw_name or "/" in raw_name or "\\" in raw_name:
+    if "\x00" in raw_name or ".." in raw_name or "/" in raw_name or "\\" in raw_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Path traversal detected in filename: {raw_name}",
@@ -133,6 +146,11 @@ def _validate_and_save_file(upload_file: UploadFile, target_dir: str) -> str:
 
     # 3. Read Content & Check Size
     content = upload_file.file.read()
+    if len(content) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Uploaded file '{safe_name}' is empty (0 bytes).",
+        )
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -146,8 +164,21 @@ def _validate_and_save_file(upload_file: UploadFile, target_dir: str) -> str:
             detail=f"File '{safe_name}' is not a valid PDF (missing %PDF- header).",
         )
 
-    # 5. Write to secure isolated path
-    dest_path = os.path.join(target_dir, safe_name)
+    # 5. Write to secure isolated path (collision-resistant & strictly contained)
+    sanitized_name = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', safe_name)
+    dest_path = os.path.join(target_dir, sanitized_name)
+    if os.path.exists(dest_path):
+        import uuid
+        dest_path = os.path.join(target_dir, f"{uuid.uuid4().hex[:8]}_{sanitized_name}")
+
+    resolved_dest = os.path.realpath(dest_path)
+    resolved_target = os.path.realpath(target_dir)
+    if not (resolved_dest.startswith(resolved_target + os.sep) or resolved_dest == resolved_target):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File path resolves outside target directory.",
+        )
+
     with open(dest_path, "wb") as f:
         f.write(content)
 

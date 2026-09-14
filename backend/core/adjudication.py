@@ -64,6 +64,22 @@ class OfficerAdjudicationRequest:
             raise ValueError("Officer Name is mandatory for accountability.")
         if not self.justification or len(self.justification.strip()) < 10:
             raise ValueError("Justification must be at least 10 characters detailing official basis for decision.")
+        
+        # Normalize decision aliases
+        decision_map = {
+            "CONFIRM": "CONFIRM_FAIL",
+            "CONFIRM_FAIL": "CONFIRM_FAIL",
+            "ACCEPT": "ACCEPT",
+            "APPROVE": "ACCEPT",
+            "PASS": "ACCEPT",
+            "WAIVE": "WAIVE",
+            "DISMISS": "DISMISS",
+            "CLARIFICATION": "DISMISS",
+        }
+        mapped = decision_map.get(str(self.decision).upper().strip())
+        if mapped:
+            self.decision = mapped
+
         valid_decisions = {d.value for d in AdjudicationDecision}
         if self.decision.upper() not in valid_decisions:
             raise ValueError(f"Invalid decision '{self.decision}'. Allowed decisions: {sorted(valid_decisions)}")

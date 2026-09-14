@@ -483,16 +483,42 @@ class VerificationOrchestrator:
             raise
 
     def get_verification(self, verification_id: str) -> Optional[AggregatedVerification]:
+        if not verification_id:
+            return None
         if verification_id in self._verifications:
             return self._verifications[verification_id]
+
+        # Check normalized / alias in memory first
+        norm_id = str(verification_id).strip().replace("/", "_").replace("\\", "_")
+        if norm_id in self._verifications:
+            return self._verifications[norm_id]
+
+        for vid, v in self._verifications.items():
+            if vid.lower() == norm_id.lower():
+                return v
+            for r in getattr(v, "verification_results", []):
+                r_dict = r if isinstance(r, dict) else r.to_dict()
+                if verification_id in (r_dict.get("verification_id"), r_dict.get("requirement_id")):
+                    return v
+            for item in getattr(v, "human_review_items", []):
+                item_dict = item if isinstance(item, dict) else item.to_dict()
+                if verification_id in (item_dict.get("review_id"), item_dict.get("related_verification_id")):
+                    return v
+            for f in getattr(v, "contradictions", []):
+                f_dict = f if isinstance(f, dict) else f.to_dict()
+                if verification_id == f_dict.get("finding_id"):
+                    return v
+
         return self._load_from_disk(verification_id)
 
     def get_dossier(self, verification_id: str) -> Optional[VerificationDossier]:
+        if not verification_id:
+            return None
         if verification_id in self._dossiers:
             return self._dossiers[verification_id]
         verif = self.get_verification(verification_id)
-        if verif and verification_id in self._dossiers:
-            return self._dossiers[verification_id]
+        if verif and verif.verification_id in self._dossiers:
+            return self._dossiers[verif.verification_id]
         return None
 
     def _generate_dossier(
@@ -598,13 +624,20 @@ class VerificationOrchestrator:
     def _save_to_disk(self, aggregated: AggregatedVerification, dossier: VerificationDossier) -> None:
         filename = _get_cache_filename(aggregated.verification_id)
         verif_file = os.path.join(self.cache_dir, filename)
+        temp_file = os.path.join(self.cache_dir, f".tmp_{os.getpid()}_{filename}")
         try:
-            with open(verif_file, "w", encoding="utf-8") as f:
+            with open(temp_file, "w", encoding="utf-8") as f:
                 json.dump({
                     "verification": aggregated.to_dict(),
                     "dossier": dossier.to_dict()
                 }, f, indent=2)
+            os.replace(temp_file, verif_file)
         except Exception as e:
+            if os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                except Exception:
+                    pass
             logger.error(f"Failed to persist verification '{aggregated.verification_id}' to {verif_file}: {e}")
             raise IOError(f"Failed to persist verification to disk: {e}") from e
 
@@ -617,7 +650,7 @@ class VerificationOrchestrator:
         if os.path.exists(self.cache_dir):
             try:
                 for fname in os.listdir(self.cache_dir):
-                    if not fname.endswith(".json"):
+                    if not fname.endswith(".json") or fname.startswith("."):
                         continue
                     filepath = os.path.join(self.cache_dir, fname)
                     try:
@@ -654,7 +687,8 @@ class VerificationOrchestrator:
                     item_dict["bid_id"] = v.bid_id
                 if not item_dict.get("tender_id"):
                     item_dict["tender_id"] = v.tender_id
-                if not item_dict.get("verification_id"):
+                current_vid = item_dict.get("verification_id")
+                if not current_vid or "-REQ-" in str(current_vid):
                     item_dict["verification_id"] = v.verification_id
                 if not item_dict.get("source_documents"):
                     item_dict["source_documents"] = [f"{v.bid_id}.pdf"]
@@ -666,43 +700,96 @@ class VerificationOrchestrator:
         return all_items
 
     def _load_from_disk(self, verification_id: str) -> Optional[AggregatedVerification]:
-        filename = _get_cache_filename(verification_id)
-        verif_file = os.path.join(self.cache_dir, filename)
-        if not os.path.exists(verif_file):
-            # Legacy fallback: check if file was saved under raw verification_id
-            legacy_file = os.path.join(self.cache_dir, f"{verification_id}.json")
-            if os.path.exists(legacy_file):
-                verif_file = legacy_file
-            else:
-                # Direct scan of cache_dir to locate file by internal verification_id
-                if os.path.exists(self.cache_dir):
-                    for fn in os.listdir(self.cache_dir):
-                        if fn.endswith(".json"):
-                            try:
-                                fp = os.path.join(self.cache_dir, fn)
-                                with open(fp, "r", encoding="utf-8") as f:
-                                    data = json.load(f)
-                                if data.get("verification", {}).get("verification_id") == verification_id:
-                                    verif = AggregatedVerification.from_dict(data["verification"])
-                                    dossier = VerificationDossier.from_dict(data["dossier"])
-                                    self._verifications[verification_id] = verif
-                                    self._dossiers[verification_id] = dossier
-                                    return verif
-                            except Exception:
-                                pass
-                return None
-
-        try:
-            with open(verif_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            verif = AggregatedVerification.from_dict(data["verification"])
-            dossier = VerificationDossier.from_dict(data["dossier"])
-            self._verifications[verification_id] = verif
-            self._dossiers[verification_id] = dossier
-            return verif
-        except Exception as e:
-            logger.error(f"Failed to load verification '{verification_id}' from disk cache: {e}")
+        if not verification_id:
             return None
+
+        # 1. Direct filename lookup
+        candidates = [
+            _get_cache_filename(verification_id),
+            f"{verification_id}.json",
+            f"{str(verification_id).replace('/', '_').replace('\\', '_')}.json",
+        ]
+        for cname in candidates:
+            cpath = os.path.join(self.cache_dir, cname)
+            if os.path.exists(cpath):
+                try:
+                    with open(cpath, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if "verification" in data and "dossier" in data:
+                        verif = AggregatedVerification.from_dict(data["verification"])
+                        dossier = VerificationDossier.from_dict(data["dossier"])
+                        self._verifications[verif.verification_id] = verif
+                        self._dossiers[verif.verification_id] = dossier
+                        return verif
+                except Exception as e:
+                    logger.debug(f"Could not load candidate cache file {cpath}: {e}")
+
+        # 2. Comprehensive search across cache_dir
+        if not os.path.exists(self.cache_dir):
+            return None
+
+        target_norm = str(verification_id).strip().replace("/", "_").replace("\\", "_").lower()
+        try:
+            for fn in os.listdir(self.cache_dir):
+                if not fn.endswith(".json") or fn.startswith("."):
+                    continue
+                fp = os.path.join(self.cache_dir, fn)
+                try:
+                    with open(fp, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    if not ("verification" in data and "dossier" in data):
+                        continue
+                    v_dict = data.get("verification", {})
+                    vid = str(v_dict.get("verification_id", ""))
+                    vid_norm = vid.replace("/", "_").replace("\\", "_").lower()
+
+                    # Exact or normalized match
+                    matched = (vid == verification_id or vid_norm == target_norm)
+
+                    # Match by tender_id or bid_id
+                    if not matched:
+                        tid = str(v_dict.get("tender_id", "")).replace("/", "_").replace("\\", "_").lower()
+                        bid = str(v_dict.get("bid_id", "")).replace("/", "_").replace("\\", "_").lower()
+                        if target_norm in (f"verif-{tid}-{bid}", f"{tid}-{bid}", bid):
+                            matched = True
+
+                    # Match by clause result ID (e.g. VERIF-JARVIS_PASS_BIDDER-REQ-TENDER-0001-001)
+                    if not matched:
+                        for r in v_dict.get("verification_results", []):
+                            r_vid = str(r.get("verification_id", ""))
+                            r_req = str(r.get("requirement_id", ""))
+                            if verification_id in (r_vid, r_req):
+                                matched = True
+                                break
+
+                    # Match by review item ID or related verification ID
+                    if not matched:
+                        for item in v_dict.get("human_review_items", []):
+                            rev_id = str(item.get("review_id", ""))
+                            rel_id = str(item.get("related_verification_id", ""))
+                            if verification_id in (rev_id, rel_id):
+                                matched = True
+                                break
+
+                    # Match by contradiction finding ID
+                    if not matched:
+                        for f_item in v_dict.get("contradictions", []):
+                            if verification_id == str(f_item.get("finding_id", "")):
+                                matched = True
+                                break
+
+                    if matched:
+                        verif = AggregatedVerification.from_dict(v_dict)
+                        dossier = VerificationDossier.from_dict(data["dossier"])
+                        self._verifications[verif.verification_id] = verif
+                        self._dossiers[verif.verification_id] = dossier
+                        return verif
+                except Exception:
+                    continue
+        except Exception as e:
+            logger.error(f"Failed during cache_dir scan for verification '{verification_id}': {e}")
+
+        return None
 
     def adjudicate(
         self,

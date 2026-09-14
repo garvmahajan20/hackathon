@@ -80,20 +80,32 @@ export const ReviewQueuePage: React.FC = () => {
     apiClient
       .getReviewQueue()
       .then((items) => {
-        const formatted: ReviewRow[] = (items || []).map((item: any) => ({
-          review_id: item.review_id,
-          bid_id: item.bid_id || "BID-UNKNOWN",
-          tender_id: item.tender_id || "TENDER-UNKNOWN",
-          verification_id: item.verification_id || (item.related_verification_id && !item.related_verification_id.includes("-REQ-") ? item.related_verification_id : `VERIF-${item.tender_id || 'TND'}-${item.bid_id || 'BID'}`),
-          category: item.category || "MANUAL_INSPECTION",
-          severity: item.severity || "MEDIUM",
-          reason: item.reason || "",
-          evidence_references: item.evidence_references || [],
-          source_documents: item.source_documents && item.source_documents.length > 0 ? item.source_documents : [`${item.bid_id || "bid"}.pdf`],
-          source_pages: item.source_pages && item.source_pages.length > 0 ? item.source_pages : [1],
-          created_at: item.created_at || "",
-          status: item.status || "OPEN",
-        }));
+        const formatted: ReviewRow[] = (items || []).map((item: any) => {
+          const rawVid = item.verification_id;
+          const relVid = item.related_verification_id;
+          const cleanVid = (rawVid && !rawVid.includes("-REQ-"))
+            ? rawVid
+            : (relVid && !relVid.includes("-REQ-"))
+            ? relVid
+            : (item.tender_id && item.bid_id)
+            ? `VERIF-${String(item.tender_id).replace(/\//g, '_')}-${String(item.bid_id).replace(/\//g, '_')}`
+            : (rawVid || "VERIF-UNKNOWN");
+
+          return {
+            review_id: item.review_id,
+            bid_id: item.bid_id || "BID-UNKNOWN",
+            tender_id: item.tender_id || "TENDER-UNKNOWN",
+            verification_id: cleanVid,
+            category: item.category || "MANUAL_INSPECTION",
+            severity: item.severity || "MEDIUM",
+            reason: item.reason || "",
+            evidence_references: item.evidence_references || [],
+            source_documents: item.source_documents && item.source_documents.length > 0 ? item.source_documents : [`${item.bid_id || "bid"}.pdf`],
+            source_pages: item.source_pages && item.source_pages.length > 0 ? item.source_pages : [1],
+            created_at: item.created_at || "",
+            status: item.status || "OPEN",
+          };
+        });
         setLiveItems(formatted);
       })
       .catch((err) => {
@@ -142,8 +154,9 @@ export const ReviewQueuePage: React.FC = () => {
     setSavedMessage(null);
   };
 
-  const recordDecision = () => {
+  const recordDecision = async () => {
     if (!selectedReview || !selectedDecision) return;
+
     setDecisions((prev) => {
       const next = { ...prev, [selectedReview.review_id]: selectedDecision };
       try {
@@ -153,6 +166,28 @@ export const ReviewQueuePage: React.FC = () => {
       }
       return next;
     });
+
+    // Authoritative backend sync for live verifications
+    if (selectedReview.verification_id && !selectedReview.verification_id.startsWith("VERIF-TENDER-0069")) {
+      try {
+        const justificationText = officerNote.trim().length >= 10
+          ? officerNote.trim()
+          : `Official officer adjudication: ${decisionMeta[selectedDecision].label} - ${decisionMeta[selectedDecision].description}`;
+
+        await apiClient.adjudicate(selectedReview.verification_id, {
+          target_id: selectedReview.review_id,
+          decision: selectedDecision,
+          officer_id: "OFFICER-001",
+          officer_name: "Procurement Officer",
+          justification: justificationText,
+          officer_role: "Competent Authority / Procurement Officer",
+          target_type: "REVIEW_ITEM",
+        });
+      } catch (err: any) {
+        console.warn("Could not sync adjudication to backend:", err);
+      }
+    }
+
     setSavedMessage(`${decisionMeta[selectedDecision].label} recorded for ${selectedReview.review_id}.`);
     setOfficerNote("");
   };

@@ -196,6 +196,47 @@ export const apiClient = {
 
     return finalResult;
   },
+
+  /**
+   * Procurement Officer Adjudication / Override
+   */
+  async adjudicate(
+    verificationId: string,
+    payload: {
+      target_id: string;
+      decision: string;
+      officer_id: string;
+      officer_name: string;
+      justification: string;
+      officer_role?: string;
+      reference_document?: string;
+      target_type?: string;
+    }
+  ): Promise<any> {
+    return request<any>(`/api/v1/verification/${encodeURIComponent(verificationId)}/adjudicate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  },
+
+  /**
+   * Retrieves complete audit trail and officer adjudication records
+   */
+  async getAuditTrail(verificationId: string): Promise<any> {
+    return request<any>(`/api/v1/verification/${encodeURIComponent(verificationId)}/audit-trail`);
+  },
+
+  /**
+   * Executes deterministic replay verification against stored snapshot
+   */
+  async replayVerification(verificationId: string): Promise<any> {
+    return request<any>(`/api/v1/verification/${encodeURIComponent(verificationId)}/replay`, {
+      method: "POST",
+    });
+  },
 };
 
 export interface StageProgressEvent {

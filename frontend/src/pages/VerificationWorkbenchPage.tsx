@@ -114,7 +114,8 @@ export const VerificationWorkbenchPage: React.FC = () => {
 
   const physicalBlocks: (PhysicalTextBlock & { matched_clause_id?: string })[] = useMemo(() => {
     if (!verification) return [];
-    if (DEMO_PHYSICAL_TEXT_BLOCKS[verification.bid_id]) {
+    const isSeededDemo = SEEDED_DEMO_VERIFICATIONS.some((s) => s.verification_id === verification?.verification_id);
+    if (isSeededDemo && DEMO_PHYSICAL_TEXT_BLOCKS[verification.bid_id]) {
       return DEMO_PHYSICAL_TEXT_BLOCKS[verification.bid_id];
     }
 
@@ -122,9 +123,10 @@ export const VerificationWorkbenchPage: React.FC = () => {
     const seenBlockIds = new Set<string>();
 
     // 1. Gather all genuine evidence directly from verification results
-    verification.verification_results.forEach((vr) => {
-      (vr.evidence || []).forEach((ev, evIdx) => {
-        if (!ev.snippet) return;
+    (verification.verification_results || []).forEach((vr) => {
+      (vr.evidence || []).forEach((ev: any, evIdx: number) => {
+        const snippet = ev.snippet || ev.raw_text_snippet || ev.text || "";
+        if (!snippet.trim()) return;
         const blkId = ev.block_id || `BLK-${vr.requirement_id}-${evIdx}`;
         if (!seenBlockIds.has(blkId)) {
           seenBlockIds.add(blkId);
@@ -132,7 +134,7 @@ export const VerificationWorkbenchPage: React.FC = () => {
             id: blkId,
             page: ev.page || 1,
             bbox: (ev.bbox as [number, number, number, number]) || [0, 0, 0, 0],
-            text: ev.snippet,
+            text: snippet,
             grounding_state: "VERIFIED",
             confidence_heuristic: "HIGH",
             clause_id: vr.requirement_id,
@@ -145,20 +147,27 @@ export const VerificationWorkbenchPage: React.FC = () => {
     // 2. Also check if dossier contains additional facts from bidder extraction
     if (loadedDossier?.bidder?.facts && Array.isArray(loadedDossier.bidder.facts)) {
       loadedDossier.bidder.facts.forEach((fact: any, fIdx: number) => {
-        (fact.evidence || []).forEach((ev: any, evIdx: number) => {
-          if (!ev.snippet) return;
+        const factSnippet = fact.raw_text_snippet || fact.snippet || String(fact.value || "");
+        const evList = (fact.evidence && fact.evidence.length > 0) ? fact.evidence : [{
+          page: fact.page || 1,
+          bbox: fact.bbox || [0, 0, 0, 0],
+          snippet: factSnippet,
+        }];
+        evList.forEach((ev: any, evIdx: number) => {
+          const snippet = ev.snippet || ev.raw_text_snippet || factSnippet;
+          if (!snippet.trim()) return;
           const blkId = ev.block_id || `FACT-BLK-${fIdx}-${evIdx}`;
           if (!seenBlockIds.has(blkId)) {
             seenBlockIds.add(blkId);
             blocks.push({
               id: blkId,
-              page: ev.page || 1,
-              bbox: (ev.bbox as [number, number, number, number]) || [0, 0, 0, 0],
-              text: ev.snippet,
+              page: ev.page || fact.page || 1,
+              bbox: (ev.bbox || fact.bbox || [0, 0, 0, 0]) as [number, number, number, number],
+              text: snippet,
               grounding_state: "VERIFIED",
               confidence_heuristic: "HIGH",
-              clause_id: fact.field || undefined,
-              matched_clause_id: fact.field || undefined,
+              clause_id: fact.field || fact.canonical_field || undefined,
+              matched_clause_id: fact.field || fact.canonical_field || undefined,
             });
           }
         });
@@ -200,11 +209,12 @@ export const VerificationWorkbenchPage: React.FC = () => {
     // 1. If bidder submitted physical evidence for this requirement:
     if (item && item.evidence && item.evidence.length > 0 && item.evidence[0]) {
       const ev = item.evidence[0];
+      const snippet = ev.snippet || (ev as any).raw_text_snippet || (ev as any).text || "";
       setActiveEvidence({
         document: ev.document || `${verification.bid_id}.pdf`,
         page: ev.page || 1,
         bbox: ev.bbox,
-        snippet: ev.snippet || "",
+        snippet: snippet,
         requirement_id: item.requirement_id,
         expected: item.expected,
         actual: item.actual,
@@ -217,17 +227,41 @@ export const VerificationWorkbenchPage: React.FC = () => {
       return;
     }
 
+    // 1b. If evidence array was empty but fact exists in dossier
+    if (item?.fact_id && loadedDossier?.bidder?.facts && Array.isArray(loadedDossier.bidder.facts)) {
+      const matchedFact = loadedDossier.bidder.facts.find((f: any) => f.fact_id === item.fact_id);
+      if (matchedFact) {
+        const factSnippet = matchedFact.raw_text_snippet || matchedFact.snippet || String(matchedFact.value || "");
+        setActiveEvidence({
+          document: matchedFact.source_document || `${verification.bid_id}.pdf`,
+          page: matchedFact.page || 1,
+          bbox: matchedFact.bbox,
+          snippet: factSnippet,
+          requirement_id: item.requirement_id,
+          expected: item.expected,
+          actual: item.actual,
+          operator_used: item.operator_used,
+          status: item.status,
+          reason: item.reason,
+          grounding_state: "VERIFIED",
+          confidence_heuristic: "HIGH",
+        });
+        return;
+      }
+    }
+
     // 2. If bidder evidence is missing, check for tender-side requirement specification
     const tenderReq = loadedDossier?.tender?.requirements?.find(
       (tr: any) => tr.requirement_id === clauseId
     );
     if (tenderReq && tenderReq.evidence && tenderReq.evidence.length > 0 && tenderReq.evidence[0]) {
       const trEv = tenderReq.evidence[0];
+      const trSnippet = trEv.snippet || (trEv as any).raw_text_snippet || tenderReq.description || "";
       setActiveEvidence({
         document: trEv.document || `${verification.tender_id}.pdf`,
         page: trEv.page || tenderReq.source_page || 1,
         bbox: trEv.bbox,
-        snippet: trEv.snippet || tenderReq.description || "",
+        snippet: trSnippet,
         requirement_id: item ? item.requirement_id : clauseId,
         expected: item?.expected ?? tenderReq.expected_value,
         actual: "MISSING (No bidder evidence submitted)",
