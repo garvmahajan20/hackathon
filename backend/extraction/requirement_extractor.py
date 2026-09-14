@@ -444,40 +444,18 @@ class TenderRequirementExtractor:
         process condition, or general policy disclaimer rather than an actionable bidder obligation.
         Returns (is_admin, canonical_req_type).
         """
-        fld_lower = (c.field or "").lower()
-        desc_lower = (c.description or "").lower()
-        sc_lower = (c.source_clause or "").lower()
-        combined = f"{fld_lower} {desc_lower} {sc_lower}"
-
-        # 1. Administrative / Informational Metadata
-        info_keywords = [
-            "ministry", "department", "organisation", "organization", "office name",
-            "grievance redressal", "item category", "bid number", "dated", "bid document date",
-            "estimated bid value"
-        ]
-        if any(k in combined for k in info_keywords):
-            return True, "INFORMATIONAL"
-
-        # 2. Process Conditions
-        process_keywords = [
-            "bid end date", "bid opening date", "bid offer validity", "reverse auction",
-            "two packet", "auto extension", "auto-extension", "auto_extension",
-            "clarification window", "technical clarifications", "evaluation method",
-            "bid splitting", "option clause", "consignee delivery", "prohibition on"
-        ]
-        if any(k in combined for k in process_keywords):
-            return True, "PROCESS_CONDITION"
-
-        # 3. General Policies / Disclaimers / Legal clauses
-        policy_keywords = [
-            "mse relaxation", "startup relaxation", "traders are excluded",
-            "arbitration clause", "mediation clause", "breach of contract",
-            "null & void", "null and void", "service level agreement", "sla conditions"
-        ]
-        if any(k in combined for k in policy_keywords):
-            return True, "GENERAL_POLICY"
-
-        return False, c.requirement_type or "BIDDER_COMPLIANCE"
+        from backend.core.classification import classify_requirement_scope
+        req_type = classify_requirement_scope(
+            description=c.description,
+            field=c.field,
+            mandatory=c.mandatory,
+            operator=c.operator,
+            expected_value=c.expected_value,
+            source_clause=c.source_clause,
+            declared_type=c.requirement_type,
+        )
+        is_admin = req_type in ("PROCESS_CONDITION", "INFORMATIONAL", "GENERAL_POLICY")
+        return is_admin, req_type
 
     def _merge_and_deduplicate_candidates(self, candidates: List[CandidateRequirement]) -> List[CandidateRequirement]:
         from backend.core.ontology import resolve_field

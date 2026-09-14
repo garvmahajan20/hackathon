@@ -139,6 +139,14 @@ def evaluate_eq(actual: Any, expected: Any, field_name: str = "") -> OperatorRes
         else:
             return OperatorResult(ComplianceStatus.FAIL, f"Boolean requirement mismatch: actual {act_b} != expected {exp_b}.")
 
+    # 1B. Undertaking / Submission "Required" check
+    exp_lower = str(expected).lower().strip()
+    if exp_lower in ("required", "mandatory"):
+        if normalize_existence(actual) and str(actual).lower() not in ("no", "none", "false", "missing", "not provided", "not submitted", "not compliant"):
+            return OperatorResult(ComplianceStatus.PASS, f"Required undertaking/submission provided: '{actual}'.")
+        else:
+            return OperatorResult(ComplianceStatus.FAIL, f"Required undertaking/submission not provided: '{actual}'.")
+
     # 2. Try Duration check
     dur_pair = _try_duration_comparison(actual, expected)
     if dur_pair is not None and any(unit_w in str(actual).lower() or unit_w in str(expected).lower() for unit_w in ["year", "month", "day"]):

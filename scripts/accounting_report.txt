@@ -1,0 +1,136 @@
+========================================================================================================================
+EXACT REQUIREMENT ACCOUNTING (TOTAL = 108)
+========================================================================================================================
+
+--- SCOPE BREAKDOWN (Sums to Total) ---
+BIDDER_COMPLIANCE = 27
+PROCESS_CONDITION = 33
+INFORMATIONAL     = 22
+GENERAL_POLICY    = 26
+Sum of Scopes     = 108 (Matches Total: True)
+
+--- STATUS BREAKDOWN (Sums to Total) ---
+N/A     = 83
+PASS    = 25
+FAIL    = 0
+MISSING = 0
+REVIEW  = 0
+Sum of Statuses = 108 (Matches Total: True)
+
+--- AGGREGATOR METRICS ---
+Overall Status   : PASS
+Compliance Status: PASS
+Compliance Score : 100.00%
+Human Review Items: 0
+
+============================================================================================================================================
+ID                   | TYPE               | STATUS   | FIELD                                    | DESCRIPTION
+--------------------------------------------------------------------------------------------------------------------------------------------
+REQ-TENDER-0001-001  | PROCESS_CONDITION  | N/A      | bid_end_date_time                        | Bid End Date/Time
+REQ-TENDER-0001-002  | PROCESS_CONDITION  | N/A      | bid_opening_date_time                    | Bid Opening Date/Time
+REQ-TENDER-0001-003  | PROCESS_CONDITION  | N/A      | bid_offer_validity_days                  | Bid Offer Validity (From End Date)
+REQ-TENDER-0001-004  | INFORMATIONAL      | N/A      | ministry_name                            | Ministry/State Name
+REQ-TENDER-0001-005  | INFORMATIONAL      | N/A      | department_name                          | Department Name
+REQ-TENDER-0001-006  | INFORMATIONAL      | N/A      | organisation_name                        | Organisation Name
+REQ-TENDER-0001-007  | INFORMATIONAL      | N/A      | office_name                              | Office Name
+REQ-TENDER-0001-008  | INFORMATIONAL      | N/A      | grievance_redressal_contact              | Contact details of Grievance redressal
+REQ-TENDER-0001-009  | INFORMATIONAL      | N/A      | total_quantity                           | Total Quantity
+REQ-TENDER-0001-010  | INFORMATIONAL      | N/A      | item_category                            | Item Category
+REQ-TENDER-0001-011  | BIDDER_COMPLIANCE  | PASS     | min_bidder_average_annual_turnover_lakhs | Minimum Average Annual Turnover of the bidder (For 3 Years)
+REQ-TENDER-0001-012  | BIDDER_COMPLIANCE  | PASS     | oem_average_turnover_lakhs               | OEM Average Turnover (Last 3 Years)
+REQ-TENDER-0001-101  | BIDDER_COMPLIANCE  | PASS     | past_experience_years                    | Bidder or OEM must have 3 years of past experience in manufacturing and supplying same or similar category products.
+REQ-TENDER-0001-013  | BIDDER_COMPLIANCE  | N/A      | past_experience_years                    | Years of Past Experience Required for same/similar service
+REQ-TENDER-0001-014  | INFORMATIONAL      | N/A      | bid_number                               | Bid Number
+REQ-TENDER-0001-015  | INFORMATIONAL      | N/A      | bid_date                                 | Bid Document Date
+REQ-TENDER-0001-016  | GENERAL_POLICY     | N/A      | mse_relaxation_experience_turnover       | MSE Relaxation for Years of Experience and Turnover
+REQ-TENDER-0001-017  | GENERAL_POLICY     | N/A      | startup_relaxation_experience_turnover   | Startup Relaxation for Years of Experience and Turnover
+REQ-TENDER-0001-018  | INFORMATIONAL      | N/A      | required_documents                       | Mandatory documents to be submitted by the seller
+REQ-TENDER-0001-019  | BIDDER_COMPLIANCE  | PASS     | exemption_supporting_documents           | Supporting documents for exemption from Experience / Turnover Criteria must be uploaded
+REQ-TENDER-0001-020  | INFORMATIONAL      | N/A      | show_documents_to_bidders                | Display of bidder-uploaded documents to other participants
+REQ-TENDER-0001-021  | PROCESS_CONDITION  | N/A      | min_bids_to_disable_auto_extension       | Minimum number of bids required to disable automatic bid extension
+REQ-TENDER-0001-022  | PROCESS_CONDITION  | N/A      | auto_extension_days                      | Number of days for which Bid would be auto-extended
+REQ-TENDER-0001-023  | PROCESS_CONDITION  | N/A      | max_auto_extension_count                 | Maximum number of auto extensions allowed
+REQ-TENDER-0001-024  | BIDDER_COMPLIANCE  | PASS     | past_performance_percentage              | Past Performance requirement percentage
+REQ-TENDER-0001-025  | PROCESS_CONDITION  | N/A      | bid_to_ra_enabled                        | Bid to Reverse Auction enabled
+REQ-TENDER-0001-026  | PROCESS_CONDITION  | N/A      | bid_type                                 | Type of Bid
+REQ-TENDER-0001-027  | PROCESS_CONDITION  | N/A      | technical_clarification_window           | Time allowed for Technical Clarifications during technical evaluation
+REQ-TENDER-0001-028  | PROCESS_CONDITION  | N/A      | inspection_required                      | Inspection Required by Empanelled Inspection Authority
+REQ-TENDER-0001-029  | INFORMATIONAL      | N/A      | estimated_bid_value                      | Estimated Bid Value
+REQ-TENDER-0001-030  | PROCESS_CONDITION  | N/A      | evaluation_method                        | Evaluation Method
+REQ-TENDER-0001-031  | GENERAL_POLICY     | N/A      | arbitration_clause                       | Arbitration Clause applicability
+REQ-TENDER-0001-032  | GENERAL_POLICY     | N/A      | mediation_clause                         | Mediation Clause applicability
+REQ-TENDER-0001-033  | PROCESS_CONDITION  | N/A      | emd_advisory_bank                        | EMD Advisory Bank
+REQ-TENDER-0001-034  | BIDDER_COMPLIANCE  | N/A      | emd_amount                               | Bidder must submit EMD of 6,00,000 INR.
+REQ-TENDER-0001-035  | PROCESS_CONDITION  | N/A      | epbg_advisory_bank                       | ePBG Advisory Bank
+REQ-TENDER-0001-036  | BIDDER_COMPLIANCE  | PASS     | epbg_percentage                          | ePBG Percentage
+REQ-TENDER-0001-037  | BIDDER_COMPLIANCE  | PASS     | epbg_duration_months                     | ePBG Duration in Months
+REQ-TENDER-0001-038  | BIDDER_COMPLIANCE  | PASS     | emd_exemption_proof                      | Requirement for valid supporting documents for EMD exemption
+REQ-TENDER-0001-039  | GENERAL_POLICY     | N/A      | mse_emd_exemption_eligibility            | MSE EMD Exemption eligibility restriction (Traders excluded)
+REQ-TENDER-0001-040  | INFORMATIONAL      | N/A      | beneficiary_name                         | EMD and Performance Security Beneficiary
+REQ-TENDER-0001-041  | PROCESS_CONDITION  | N/A      | surety_bond_acceptance                   | Acceptance of Surety Bond for EMD/Performance Security
+REQ-TENDER-0001-042  | PROCESS_CONDITION  | N/A      | bid_splitting                            | Bid splitting applicability
+REQ-TENDER-0001-043  | PROCESS_CONDITION  | N/A      | mii_purchase_preference                  | MII Purchase Preference applicability
+REQ-TENDER-0001-044  | PROCESS_CONDITION  | N/A      | mii_price_margin_percentage              | MII Purchase Preference price margin
+REQ-TENDER-0001-045  | PROCESS_CONDITION  | N/A      | mii_purchase_preference_max_percentage   | Maximum Percentage of Bid quantity for MII purchase preference is 50%
+REQ-TENDER-0001-046  | GENERAL_POLICY     | N/A      | mii_local_supplier_restriction           | Allow participation only from Class 1/Class 2 local suppliers as per the Public procurement(Preference to Make-in-india) order 2017 date 16.09.2020 (as amended and applicable time to time)
+REQ-TENDER-0001-047  | PROCESS_CONDITION  | N/A      | mse_purchase_preference_enabled          | MSE Purchase Preference is enabled
+REQ-TENDER-0001-048  | PROCESS_CONDITION  | N/A      | mse_purchase_preference_price_margin_percentage | Purchase Preference to MSE OEMs/ Service Provider available upto price within L1+X% where X is 15%
+REQ-TENDER-0001-049  | PROCESS_CONDITION  | N/A      | mse_purchase_preference_quantity_percentage | Percentage of Bid quantity/amount for MSE OEMs/ Service Provider Purchase preference is 25%
+REQ-TENDER-0001-050  | INFORMATIONAL      | N/A      | bidder_minimum_average_annual_turnover   | The minimum average annual financial turnover of the bidder during the last three years, ending on 31st March of the previous financial year, should be as indicated in the bid document.
+REQ-TENDER-0001-051  | BIDDER_COMPLIANCE  | PASS     | bidder_turnover_documentary_evidence     | Documentary evidence for bidder turnover in the form of certified Audited Balance Sheets of relevant periods or a certificate from the Chartered Accountant / Cost Accountant indicating the turnover details for the relevant period shall be uploaded with the bid.
+REQ-TENDER-0001-052  | GENERAL_POLICY     | N/A      | bidder_turnover_less_than_3_years_old_rule | In case the date of constitution / incorporation of the bidder is less than 3-year-old, the average turnover in respect of the completed financial years after the date of constitution shall be taken into account.
+REQ-TENDER-0001-053  | INFORMATIONAL      | N/A      | bidder_or_oem_experience_years           | The Bidder or its OEM of the product offered in the bid {themselves or through reseller(s)} should have regularly, manufactured and supplied same or similar Category Products to any Central / State Govt Organization / PSU for number of Financial years as indicated in the bid document before the bid opening date.
+REQ-TENDER-0001-054  | BIDDER_COMPLIANCE  | PASS     | experience_documentary_evidence          | Copies of relevant contracts and delivery acceptance certificates like CRAC to be submitted along with bid in support of having supplied some quantity during each of the Financial year.
+REQ-TENDER-0001-055  | PROCESS_CONDITION  | N/A      | bunch_bid_primary_product_experience_rule | In case of bunch bids, the category of primary product having highest value should meet the experience criterion.
+REQ-TENDER-0001-056  | INFORMATIONAL      | N/A      | oem_minimum_average_annual_turnover      | The minimum average annual financial turnover of the OEM of the offered product during the last three years, ending on 31st March of the previous financial year, should be as indicated in the bid document.
+REQ-TENDER-0001-057  | BIDDER_COMPLIANCE  | PASS     | oem_turnover_documentary_evidence        | Documentary evidence for OEM turnover in the form of certified Audited Balance Sheets of relevant periods or a certificate from the Chartered Accountant / Cost Accountant indicating the turnover details for the relevant period shall be uploaded with the bid.
+REQ-TENDER-0001-058  | GENERAL_POLICY     | N/A      | oem_turnover_less_than_3_years_old_rule  | In case the date of constitution / incorporation of the OEM is less than 3 year old, the average turnover in respect of the completed financial years after the date of constitution shall be taken into account.
+REQ-TENDER-0001-059  | GENERAL_POLICY     | N/A      | mii_preference_bids_less_than_200_crore  | Preference shall be given to Class 1 local supplier as defined in public procurement (Preference to Make in India), Order 2017 as amended from time to time for bids less than 200 Crore.
+REQ-TENDER-0001-060  | BIDDER_COMPLIANCE  | PASS     | mii_local_content_oem_certificate        | If the bidder wants to avail the Purchase preference, the bidder must upload a certificate from the OEM regarding the percentage of the local content and the details of locations at which the local value addition is made along with their bid, failing which no purchase preference shall be granted.
+REQ-TENDER-0001-061  | GENERAL_POLICY     | N/A      | mii_local_content_auditor_certification_threshold | In case the bid value is more than Rs 10 Crore, the declaration relating to percentage of local content shall be certified by the statutory auditor or cost auditor, if the OEM is a company.
+REQ-TENDER-0001-062  | GENERAL_POLICY     | N/A      | mii_eligibility                          | Only Class-I and Class-II Local suppliers are eligible to bid; Non-Local suppliers are not eligible.
+REQ-TENDER-0001-063  | BIDDER_COMPLIANCE  | PASS     | class_1_local_content_threshold          | Minimum 50% Local Content required for Class-I Local Supplier.
+REQ-TENDER-0001-064  | GENERAL_POLICY     | N/A      | class_2_local_content_threshold          | Minimum 20% Local Content required for Class-II Local Supplier.
+REQ-TENDER-0001-065  | PROCESS_CONDITION  | N/A      | mse_purchase_preference                  | MSE Purchase Preference requires valid Udyam Certificate and online validation.
+REQ-TENDER-0001-066  | PROCESS_CONDITION  | N/A      | mse_trader_eligibility                   | MSE Purchase Preference is only applicable to Manufacturers/OEMs for products and Service Providers for services; Traders are excluded.
+REQ-TENDER-0001-067  | INFORMATIONAL      | N/A      | mse_price_match_margin                   | MSE price match opportunity: If L1 is not MSE, MSEs within L1+15% margin can match L1 price for 25% of total quantity.
+REQ-TENDER-0001-068  | BIDDER_COMPLIANCE  | PASS     | past_performance_threshold               | Past Performance: Bidder/OEM must have supplied same/similar category products for 80% of bid quantity in at least one of the last three financial years.
+REQ-TENDER-0001-069  | BIDDER_COMPLIANCE  | PASS     | past_performance_proof                   | Submission of copies of relevant contracts/CRAC/delivery acceptance certificates required as proof of past performance.
+REQ-TENDER-0001-070  | PROCESS_CONDITION  | N/A      | payment_on_delivery_percentage           | Payment term: Percentage of product cost payable on delivery.
+REQ-TENDER-0001-071  | PROCESS_CONDITION  | N/A      | min_ict_cost_allocation_percentage       | Minimum Cost Allocation for ICT as a percentage of product cost is 20%.
+REQ-TENDER-0001-072  | PROCESS_CONDITION  | N/A      | ict_completion_days_after_site_readiness | Number of days allowed for ICT after site readiness communication to seller is 60 Days.
+REQ-TENDER-0001-073  | INFORMATIONAL      | N/A      | consignee_delivery_details               | Consignee delivery details: 500 units to Ashwini Tomar, PARCEL DIRECTORATE, MALCHA MARG POST OFFICE COMPLEX, CHANAKYAPURI, NEW DELHI-110021 within 60 days.
+REQ-TENDER-0001-074  | PROCESS_CONDITION  | N/A      | option_clause_quantity_percentage        | The Purchaser reserves the right to increase or decrease the quantity to be ordered up to 25 percent of bid quantity at the time of placement of contract, and up to 25% of the contracted quantity during the currency of the contract.
+REQ-TENDER-0001-075  | PROCESS_CONDITION  | N/A      | option_clause_additional_delivery_time_calculation | Additional delivery time for option clause quantity shall be calculated as (Increased quantity ÷ Original quantity) × Original delivery period (in days), subject to a minimum of 30 days (or original delivery period if less than 30 days).
+REQ-TENDER-0001-076  | INFORMATIONAL      | N/A      | buyer_uploaded_atc_document              | Bidders must comply with the Buyer uploaded ATC document.
+REQ-TENDER-0001-077  | GENERAL_POLICY     | N/A      | custom_boq_bid_restriction               | The bid and resultant contract shall be treated as null & void if the buyer publishes Custom / BOQ bids for items for which regular GeM categories are available (unless bunched with major regular product Category Item).
+REQ-TENDER-0001-078  | GENERAL_POLICY     | N/A      | brand_mandate_restriction                | The bid and resultant contract shall be treated as null & void if the buyer mandates procurement of / from specific Brand / Make / Model / Manufacturer / Dealer except in case of Single Bid / Proprietary Article Certificate (PAC) Buying.
+REQ-TENDER-0001-079  | GENERAL_POLICY     | N/A      | expired_suspension_disqualification_restriction | The bid and resultant contract shall be treated as null & void if the buyer includes disqualification criteria related to suspension of seller / service provider, where such suspension period has already expired.
+REQ-TENDER-0001-080  | GENERAL_POLICY     | N/A      | physical_document_submission_restriction | The bid and resultant contract shall be treated as null & void if the buyer mandates submission of documents (other than EMD and signed Integrity Pact - which can be submitted within 5 days of bid opening) in physical form as a pre-requisite to qualify bidders.
+REQ-TENDER-0001-081  | GENERAL_POLICY     | N/A      | procurement_of_works                     | Prohibition on publishing bids for procurement of works on GeM.
+REQ-TENDER-0001-082  | GENERAL_POLICY     | N/A      | cross_procurement_type                   | Prohibition on procurement of Goods by creating a Service bid and vice-versa.
+REQ-TENDER-0001-083  | INFORMATIONAL      | N/A      | sample_trial_policy                      | Trial/sample submission is only permitted if allowed by the approved and published procurement policy of the Buyer's controlling Ministry/Department/State/PSE Headquarters.
+REQ-TENDER-0001-084  | INFORMATIONAL      | N/A      | experience_restriction                   | Prohibition on seeking experience from specific organizations/departments/institutes only or from foreign/export experience.
+REQ-TENDER-0001-085  | GENERAL_POLICY     | N/A      | category_selection                       | Prohibition on creating bids for items from incorrect categories.
+REQ-TENDER-0001-086  | GENERAL_POLICY     | N/A      | external_reference_prohibition           | Prohibition on referencing conditions published on external sites or external documents/clauses.
+REQ-TENDER-0001-087  | GENERAL_POLICY     | N/A      | tender_fee_prohibition                   | Prohibition on asking for any Tender fee or Bid Participation fee.
+REQ-TENDER-0001-088  | PROCESS_CONDITION  | N/A      | atc_contravention_rule                   | Buyer added ATC clauses in contravention of bid detail section (specifications, EMD, ePBG, MII, MSE) are invalid unless allowed by GeM GTC.
+REQ-TENDER-0001-089  | PROCESS_CONDITION  | N/A      | l1_tie_breaking_mechanism                | In case of multiple L1 bidders for a service bid, selection shall be made via GeM system Random Algorithm.
+REQ-TENDER-0001-090  | GENERAL_POLICY     | N/A      | additional_item_addition_method          | Prohibition on adding additional items/scope via ATC; must use bunching category, custom catalogues, or BoQ.
+REQ-TENDER-0001-091  | INFORMATIONAL      | N/A      | grievance_redressal_mechanism            | Sellers may raise grievances against ATC via the Representation window; Buyer must reply before bid opening.
+REQ-TENDER-0001-092  | BIDDER_COMPLIANCE  | PASS     | labour_law_compliance                    | Seller must comply with all applicable labour laws, including the four Labour Codes (Wages, Industrial Relations, OSHWC, Social Security).
+REQ-TENDER-0001-093  | GENERAL_POLICY     | N/A      | pre_existing_labour_laws                 | Pre-existing labour enactments (Minimum Wages Act, etc.) remain applicable for provisions pending operationalisation under new Labour Codes.
+REQ-TENDER-0001-094  | GENERAL_POLICY     | N/A      | breach_of_contract_condition             | Non-compliance with labour laws/statutory requirements constitutes a breach of contract.
+REQ-TENDER-0001-095  | GENERAL_POLICY     | N/A      | precedence_of_terms                      | Service Level Agreement (SLA) conditions override General Terms and Conditions (GTC) in case of contradiction.
+REQ-TENDER-0001-096  | GENERAL_POLICY     | N/A      | land_border_sharing_registration         | Any bidder from a country which shares a land border with India will be eligible to bid in this tender only if the bidder is registered with the Competent Authority.
+REQ-TENDER-0001-097  | BIDDER_COMPLIANCE  | PASS     | land_border_compliance_undertaking       | While participating in the bid, the bidder must undertake compliance regarding restrictions on procurement from a bidder of a country which shares a land border with India.
+REQ-TENDER-0001-098  | PROCESS_CONDITION  | N/A      | false_declaration_penalty                | Any false declaration and non-compliance of the land border restriction clause will be a ground for immediate termination of the contract and further legal action in accordance with the laws.
+REQ-TENDER-0001-099  | BIDDER_COMPLIANCE  | PASS     | average_annual_turnover                  | Bidder must maintain a minimum average annual financial turnover of 100 Lakhs during the last three years.
+REQ-TENDER-0001-100  | BIDDER_COMPLIANCE  | PASS     | oem_average_annual_turnover              | OEM must maintain a minimum average annual financial turnover of 800 Lakhs during the last three years.
+REQ-TENDER-0001-102  | BIDDER_COMPLIANCE  | PASS     | past_performance_quantity                | Bidder must provide copies of relevant contracts and delivery acceptance certificates (CRAC) proving supply of 80% of bid quantity in at least one of the last three financial years.
+REQ-TENDER-0001-103  | BIDDER_COMPLIANCE  | PASS     | turnover_document                        | Bidder must submit certified Audited Balance Sheets or CA/Cost Accountant certificate for turnover.
+REQ-TENDER-0001-104  | BIDDER_COMPLIANCE  | PASS     | oem_authorization                        | Bidder must submit OEM Authorization Certificate.
+REQ-TENDER-0001-105  | BIDDER_COMPLIANCE  | PASS     | boq_compliance                           | Bidder must submit compliance of BoQ specification and supporting documents.
+REQ-TENDER-0001-106  | BIDDER_COMPLIANCE  | PASS     | land_border_compliance                   | Bidder must provide undertaking for compliance with GeM GTC Clause 26 regarding land border restrictions.
+REQ-TENDER-0001-107  | BIDDER_COMPLIANCE  | PASS     | mii_local_content_certificate            | Bidder must submit OEM certificate regarding percentage of local content for MII preference.
+REQ-TENDER-0001-108  | PROCESS_CONDITION  | N/A      | offer_validity                           | Bid offer must remain valid for 180 days from the bid end date.

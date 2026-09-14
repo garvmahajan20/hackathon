@@ -255,6 +255,12 @@ def normalize_boolean(value: Any) -> Optional[bool]:
     if cleaned in ["false", "no", "n", "0", "not required", "exempted", "not available", "invalid", "non-compliant", "na", "n/a"]:
         return False
 
+    # Affirmative / negative phrase patterns for declarations and undertakings
+    if any(neg in cleaned for neg in ["not compliant", "non-compliant", "non compliant", "does not comply", "ineligible", "failed to"]):
+        return False
+    if any(aff in cleaned for aff in ["affirmative", "undertaking", "fully compliant", "full compliance", "certified", "certify", "compliance confirmed"]):
+        return True
+
     return None
 
 def normalize_categorical(value: Any) -> Optional[str]:

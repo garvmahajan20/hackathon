@@ -253,11 +253,11 @@ def build_pass_bidder(output_path):
         fitz.Rect(36, 230, 559, 320),
         "2. Performance Security (ePBG) Undertaking",
         [
-            "Tender ePBG Requirement: 3.00% of total contract value for 62 months duration.",
+            "Tender ePBG Requirement: 3.00% of total contract value for 36 months duration.",
             "Commitment: We unequivocally undertake to furnish an Electronic Performance Bank Guarantee (ePBG)",
-            "of exactly 3.00% of the total awarded contract value from State Bank of India valid for 62 months",
+            "of exactly 3.00% of the total awarded contract value from State Bank of India valid for 36 months",
             "within 15 days of contract award as stipulated by the Department of Posts.",
-            "ePBG Commitment: 100% Compliant | ePBG Percentage: 3.0% | ePBG Duration: 62 Months.",
+            "ePBG Commitment: 100% Compliant | ePBG Percentage: 3.0% | ePBG Duration: 36 Months.",
         ],
         border_color=(0.15, 0.35, 0.55)
     )

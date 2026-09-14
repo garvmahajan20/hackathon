@@ -17,41 +17,12 @@ from .normalization import (
     normalize_currency,
     normalize_date,
     normalize_duration,
+    normalize_existence,
     normalize_numeric,
 )
 from .operators import evaluate_operator
 from .precedence import resolve_precedence
-
-def is_administrative_or_process_condition(description: Optional[str], field: Optional[str]) -> Optional[str]:
-    combined = f"{(field or '').lower()} {(description or '').lower()}"
-
-    info_keywords = [
-        "ministry", "department", "organisation", "organization", "office name",
-        "grievance redressal", "item category", "bid number", "dated", "bid document date",
-        "estimated bid value"
-    ]
-    if any(k in combined for k in info_keywords):
-        return "INFORMATIONAL"
-
-    process_keywords = [
-        "bid end date", "bid opening date", "bid offer validity", "reverse auction",
-        "two packet", "auto extension", "auto-extension", "auto_extension",
-        "clarification window", "technical clarifications", "evaluation method",
-        "bid splitting", "option clause", "consignee delivery", "prohibition on",
-        "pre-existing labour laws", "breach of contract"
-    ]
-    if any(k in combined for k in process_keywords):
-        return "PROCESS_CONDITION"
-
-    policy_keywords = [
-        "mse relaxation", "startup relaxation", "traders are excluded",
-        "arbitration clause", "mediation clause", "null & void", "null and void",
-        "service level agreement", "sla conditions"
-    ]
-    if any(k in combined for k in policy_keywords):
-        return "GENERAL_POLICY"
-
-    return None
+from .classification import classify_requirement_scope
 
 class DeterministicRuleEngine:
     """
@@ -108,8 +79,16 @@ class DeterministicRuleEngine:
                 facts_by_canonical[canon.lower()].append(f)
 
         # Index bidder profile for statutory exemptions
-        is_mse = self._check_exemption_status(facts_by_field, ["is_mse", "mse_registered", "udyam_registration"])
-        is_startup = self._check_exemption_status(facts_by_field, ["is_startup", "startup_recognized", "dpiit_recognized"])
+        is_mse = self._check_exemption_status(
+            facts_by_field,
+            ["is_mse", "mse_registered", "udyam_registration", "udyam_number", "msme_registration_number"],
+            facts_by_canonical,
+        )
+        is_startup = self._check_exemption_status(
+            facts_by_field,
+            ["is_startup", "startup_recognized", "dpiit_recognized"],
+            facts_by_canonical,
+        )
 
         results: List[VerificationResult] = []
 
@@ -146,10 +125,15 @@ class DeterministicRuleEngine:
             req_type = getattr(req, "requirement_type", None)
             if not req_type and req.applicability and isinstance(req.applicability, dict):
                 req_type = req.applicability.get("requirement_type")
-            req_type = str(req_type).upper() if req_type else "BIDDER_COMPLIANCE"
-            admin_override = is_administrative_or_process_condition(req.description, req.field)
-            if admin_override:
-                req_type = admin_override
+            req_type = classify_requirement_scope(
+                description=req.description,
+                field=req.field,
+                mandatory=req.mandatory,
+                operator=req.operator,
+                expected_value=req.expected_value,
+                source_clause=req.source_clause,
+                declared_type=req_type,
+            )
 
             if req_type in ("PROCESS_CONDITION", "INFORMATIONAL", "GENERAL_POLICY"):
                 results.append(
@@ -366,13 +350,29 @@ class DeterministicRuleEngine:
 
         return results
 
-    def _check_exemption_status(self, facts_by_field: Dict[str, List[BidderFact]], field_candidates: List[str]) -> Optional[bool]:
+    def _check_exemption_status(
+        self,
+        facts_by_field: Dict[str, List[BidderFact]],
+        field_candidates: List[str],
+        facts_by_canonical: Optional[Dict[str, List[BidderFact]]] = None,
+    ) -> Optional[bool]:
         for candidate in field_candidates:
             if candidate in facts_by_field:
                 fact = facts_by_field[candidate][0]
                 val = normalize_boolean(fact.value)
                 if val is not None:
                     return val
+                if normalize_existence(fact.value) and str(fact.value).lower() not in ("no", "none", "false", "missing"):
+                    return True
+        if facts_by_canonical:
+            for c_key in ["udyam_registration", "is_mse", "is_startup"]:
+                if c_key in facts_by_canonical:
+                    fact = facts_by_canonical[c_key][0]
+                    val = normalize_boolean(fact.value)
+                    if val is not None:
+                        return val
+                    if normalize_existence(fact.value) and str(fact.value).lower() not in ("no", "none", "false", "missing"):
+                        return True
         return None
 
     def _evaluate_conditional_exemption(
@@ -388,7 +388,10 @@ class DeterministicRuleEngine:
 
         # 1. MSE Exemption
         req_type = getattr(req, "requirement_type", "BIDDER_COMPLIANCE")
-        if applicability.get("mse_exemption_allowed"):
+        req_field_clean = (req.field or "").lower()
+        is_emd_deposit_req = req_field_clean == "emd_amount" or getattr(req, "canonical_field", "") == "EMD_AMOUNT"
+        mse_allowed = applicability.get("mse_exemption_allowed") or is_emd_deposit_req
+        if mse_allowed and "proof" not in req_field_clean:
             if is_mse is True:
                 return VerificationResult(
                     verification_id=verif_id,
