@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import {
   useReactTable,
   getCoreRowModel,
@@ -36,12 +36,41 @@ export const RequirementMatrixTable: React.FC<RequirementMatrixTableProps> = ({
   const [sorting, setSorting] = useState<SortingState>([]);
   const [globalFilter, setGlobalFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
+  const [scopeFilter, setScopeFilter] = useState<"BIDDER" | "PROCESS" | "ALL">("BIDDER");
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
+  const isProcessCondition = (item: VerificationResult) => {
+    const s = (item.status || "").toUpperCase();
+    const rt = (item.requirement_type || "").toUpperCase();
+    const ps = (item.precedence_chain?.status || "").toUpperCase();
+    return (
+      s === "N/A" ||
+      s === "N_A" ||
+      rt === "PROCESS_CONDITION" ||
+      rt === "INFORMATIONAL" ||
+      rt === "GENERAL_POLICY" ||
+      ps === "PROCESS_CONDITION" ||
+      ps === "INFORMATIONAL" ||
+      ps === "GENERAL_POLICY"
+    );
+  };
+
+  const bidderCount = useMemo(() => data.filter((item) => !isProcessCondition(item)).length, [data]);
+  const processCount = useMemo(() => data.filter((item) => isProcessCondition(item)).length, [data]);
+
   const filteredData = useMemo(() => {
-    if (statusFilter === "ALL") return data;
-    return data.filter((item) => item.status === statusFilter);
-  }, [data, statusFilter]);
+    let list = data;
+    if (scopeFilter === "BIDDER") {
+      list = list.filter((item) => !isProcessCondition(item));
+    } else if (scopeFilter === "PROCESS") {
+      list = list.filter((item) => isProcessCondition(item));
+    }
+
+    if (statusFilter !== "ALL") {
+      list = list.filter((item) => item.status === statusFilter);
+    }
+    return list;
+  }, [data, scopeFilter, statusFilter]);
 
   const columns = useMemo<ColumnDef<VerificationResult>[]>(
     () => [
@@ -85,17 +114,25 @@ export const RequirementMatrixTable: React.FC<RequirementMatrixTableProps> = ({
           const item = row.original;
           const isSelected = selectedClauseId === item.requirement_id;
           const shortCode = item.requirement_id.split("/").pop() || item.requirement_id;
+          const isProc = isProcessCondition(item);
           return (
             <div className="flex items-center gap-1.5">
               <span
                 className={`font-mono text-[11px] font-bold px-1.5 py-0.5 rounded transition-colors ${
                   isSelected
                     ? "bg-amber-500 text-slate-950 font-extrabold"
+                    : isProc
+                    ? "bg-slate-100 text-slate-600 border border-slate-200"
                     : "bg-slate-100 text-slate-800 border border-slate-200"
                 }`}
               >
                 {shortCode}
               </span>
+              {isProc && (
+                <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-slate-200/70 text-slate-500">
+                  PROCESS
+                </span>
+              )}
             </div>
           );
         },
@@ -202,19 +239,72 @@ export const RequirementMatrixTable: React.FC<RequirementMatrixTableProps> = ({
     <div className="flex flex-col h-full bg-white border border-slate-200 rounded-lg overflow-hidden shadow-sm">
       {/* 1. Matrix Filter Bar */}
       <div className="p-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0 select-none">
-        <div className="relative flex-1 min-w-[160px] max-w-xs">
-          <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={globalFilter ?? ""}
-            onChange={(e) => setGlobalFilter(e.target.value)}
-            placeholder="Search clause or fact..."
-            className="w-full pl-7 pr-3 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          />
+        <div className="flex items-center gap-2">
+          {/* Scope Tabs */}
+          <div className="flex items-center bg-slate-200/60 p-0.5 rounded text-[11px] font-semibold">
+            <button
+              type="button"
+              onClick={() => {
+                setScopeFilter("BIDDER");
+                setStatusFilter("ALL");
+              }}
+              className={`px-2.5 py-0.5 rounded transition-colors ${
+                scopeFilter === "BIDDER"
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Obligations ({bidderCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setScopeFilter("PROCESS");
+                setStatusFilter("ALL");
+              }}
+              className={`px-2.5 py-0.5 rounded transition-colors ${
+                scopeFilter === "PROCESS"
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              Process & Policy ({processCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setScopeFilter("ALL");
+                setStatusFilter("ALL");
+              }}
+              className={`px-2.5 py-0.5 rounded transition-colors ${
+                scopeFilter === "ALL"
+                  ? "bg-white text-slate-900 shadow-2xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              All ({data.length})
+            </button>
+          </div>
+
+          <div className="relative min-w-[140px] max-w-xs">
+            <Search className="w-3 h-3 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={globalFilter ?? ""}
+              onChange={(e) => setGlobalFilter(e.target.value)}
+              placeholder="Search clause or fact..."
+              className="w-full pl-7 pr-3 py-1 bg-white border border-slate-300 rounded text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500"
+            />
+          </div>
         </div>
 
         <div className="flex items-center gap-1">
-          {["ALL", "FAIL", "REVIEW", "PASS"].map((st) => (
+          {(scopeFilter === "BIDDER"
+            ? ["ALL", "PASS", "FAIL", "MISSING", "REVIEW"]
+            : scopeFilter === "PROCESS"
+            ? ["ALL", "N/A"]
+            : ["ALL", "PASS", "FAIL", "MISSING", "REVIEW", "N/A"]
+          ).map((st) => (
             <button
               key={st}
               type="button"

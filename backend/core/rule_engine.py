@@ -22,6 +22,37 @@ from .normalization import (
 from .operators import evaluate_operator
 from .precedence import resolve_precedence
 
+def is_administrative_or_process_condition(description: Optional[str], field: Optional[str]) -> Optional[str]:
+    combined = f"{(field or '').lower()} {(description or '').lower()}"
+
+    info_keywords = [
+        "ministry", "department", "organisation", "organization", "office name",
+        "grievance redressal", "item category", "bid number", "dated", "bid document date",
+        "estimated bid value"
+    ]
+    if any(k in combined for k in info_keywords):
+        return "INFORMATIONAL"
+
+    process_keywords = [
+        "bid end date", "bid opening date", "bid offer validity", "reverse auction",
+        "two packet", "auto extension", "auto-extension", "auto_extension",
+        "clarification window", "technical clarifications", "evaluation method",
+        "bid splitting", "option clause", "consignee delivery", "prohibition on",
+        "pre-existing labour laws", "breach of contract"
+    ]
+    if any(k in combined for k in process_keywords):
+        return "PROCESS_CONDITION"
+
+    policy_keywords = [
+        "mse relaxation", "startup relaxation", "traders are excluded",
+        "arbitration clause", "mediation clause", "null & void", "null and void",
+        "service level agreement", "sla conditions"
+    ]
+    if any(k in combined for k in policy_keywords):
+        return "GENERAL_POLICY"
+
+    return None
+
 class DeterministicRuleEngine:
     """
     Pure Python Deterministic Compliance Rule Engine.
@@ -105,7 +136,8 @@ class DeterministicRuleEngine:
                             "superseded_by": req.superseded_by,
                             "source_type": req.source_type,
                             "source_priority": req.source_priority,
-                        }
+                        },
+                        requirement_type=getattr(req, "requirement_type", "PROCESS_CONDITION")
                     )
                 )
                 continue
@@ -115,6 +147,9 @@ class DeterministicRuleEngine:
             if not req_type and req.applicability and isinstance(req.applicability, dict):
                 req_type = req.applicability.get("requirement_type")
             req_type = str(req_type).upper() if req_type else "BIDDER_COMPLIANCE"
+            admin_override = is_administrative_or_process_condition(req.description, req.field)
+            if admin_override:
+                req_type = admin_override
 
             if req_type in ("PROCESS_CONDITION", "INFORMATIONAL", "GENERAL_POLICY"):
                 results.append(
@@ -134,7 +169,8 @@ class DeterministicRuleEngine:
                             "status": "PROCESS_CONDITION" if req_type == "PROCESS_CONDITION" else req_type,
                             "source_type": req.source_type,
                             "source_priority": req.source_priority,
-                        }
+                        },
+                        requirement_type=req_type
                     )
                 )
                 continue
@@ -179,7 +215,8 @@ class DeterministicRuleEngine:
                                 "status": req_type,
                                 "source_type": req.source_type,
                                 "source_priority": req.source_priority,
-                            }
+                            },
+                            requirement_type=req_type
                         )
                     )
                     continue
@@ -210,7 +247,8 @@ class DeterministicRuleEngine:
                             "status": "EFFECTIVE",
                             "source_type": req.source_type,
                             "source_priority": req.source_priority,
-                        }
+                        },
+                        requirement_type=req_type
                     )
                 )
                 continue
@@ -233,6 +271,32 @@ class DeterministicRuleEngine:
             # If operator is VALID_ON, pass reference date as expected
             if req.operator == OperatorType.VALID_ON.value:
                 expected_val = ref_date
+
+            # If expected value is a textual cross-reference pointer ("as indicated in the bid document"), it cannot be deterministically evaluated with comparison operators
+            exp_str = str(expected_val).lower().strip()
+            if any(p in exp_str for p in ["as indicated", "as per bid", "refer to bid document", "see tender"]):
+                results.append(
+                    VerificationResult(
+                        verification_id=verif_id,
+                        requirement_id=req.requirement_id,
+                        bid_id=bid_id,
+                        status=ComplianceStatus.N_A.value,
+                        severity=Severity.INFO.value,
+                        expected=str(expected_val),
+                        actual="N/A (Informational Reference)",
+                        operator_used=req.operator,
+                        reason=f"Informational cross-reference: '{req.description or req.field}' refers to detailed terms specified elsewhere in tender.",
+                        requires_human_review=False,
+                        evidence=req.evidence or [],
+                        precedence_chain={
+                            "status": "INFORMATIONAL",
+                            "source_type": req.source_type,
+                            "source_priority": req.source_priority,
+                        },
+                        requirement_type="INFORMATIONAL"
+                    )
+                )
+                continue
 
             op_result = evaluate_operator(req.operator, actual_val, expected_val, req.field or "")
 
@@ -295,7 +359,8 @@ class DeterministicRuleEngine:
                         "status": "EFFECTIVE",
                         "source_type": req.source_type,
                         "source_priority": req.source_priority,
-                    }
+                    },
+                    requirement_type=req_type
                 )
             )
 
@@ -322,6 +387,7 @@ class DeterministicRuleEngine:
         applicability = req.applicability or {}
 
         # 1. MSE Exemption
+        req_type = getattr(req, "requirement_type", "BIDDER_COMPLIANCE")
         if applicability.get("mse_exemption_allowed"):
             if is_mse is True:
                 return VerificationResult(
@@ -335,7 +401,8 @@ class DeterministicRuleEngine:
                     operator_used=req.operator,
                     reason=f"Requirement not applicable (N/A): Statutory exemption applied under GeM MSE policy for '{req.description}'. Exemptions must NEVER return PASS.",
                     requires_human_review=False,
-                    precedence_chain={"status": "EXEMPTION_APPLIED", "exemption_type": "MSE"}
+                    precedence_chain={"status": "EXEMPTION_APPLIED", "exemption_type": "MSE"},
+                    requirement_type=req_type
                 )
             elif is_mse is None and applicability.get("require_explicit_claim"):
                 # Missing evidence on claimed exemption
@@ -350,7 +417,8 @@ class DeterministicRuleEngine:
                     operator_used=req.operator,
                     reason="MSE exemption is allowed by tender, but bidder MSE registration evidence is missing or unverified.",
                     requires_human_review=True,
-                    precedence_chain={"status": "EXEMPTION_REVIEW", "exemption_type": "MSE"}
+                    precedence_chain={"status": "EXEMPTION_REVIEW", "exemption_type": "MSE"},
+                    requirement_type=req_type
                 )
 
         # 2. Startup Exemption
@@ -368,7 +436,8 @@ class DeterministicRuleEngine:
                     operator_used=req.operator,
                     reason=f"Requirement not applicable (N/A): Statutory exemption applied under Startup India / GeM policy for '{req.description}'. Exemptions must NEVER return PASS.",
                     requires_human_review=False,
-                    precedence_chain={"status": "EXEMPTION_APPLIED", "exemption_type": "STARTUP"}
+                    precedence_chain={"status": "EXEMPTION_APPLIED", "exemption_type": "STARTUP"},
+                    requirement_type=req_type
                 )
             elif is_startup is True or (is_startup is None and applicability.get("require_explicit_claim")):
                 return VerificationResult(
@@ -382,7 +451,8 @@ class DeterministicRuleEngine:
                     operator_used=req.operator,
                     reason="Startup India exemption claimed, but verifiable DPIIT registration certificate is absent or ambiguous; marked UNKNOWN_REVIEW.",
                     requires_human_review=True,
-                    precedence_chain={"status": "EXEMPTION_REVIEW", "exemption_type": "STARTUP"}
+                    precedence_chain={"status": "EXEMPTION_REVIEW", "exemption_type": "STARTUP"},
+                    requirement_type=req_type
                 )
 
         return None

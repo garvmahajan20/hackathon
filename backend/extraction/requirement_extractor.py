@@ -141,6 +141,7 @@ class TenderRequirementExtractor:
                 applicability=appl if appl else None,
                 evidence=ground_res.resolved_evidence,
                 extraction_confidence="HIGH" if ground_res.status == ExtractionStatus.ACCEPTED else "MEDIUM",
+                requirement_type=cand.requirement_type or "BIDDER_COMPLIANCE",
             )
 
             # Validate against canonical contract schema
@@ -369,6 +370,7 @@ class TenderRequirementExtractor:
                     source_pass=c.source_pass,
                 ))
             elif "documents_required_from_seller" in fld_lower or "document_required_from_seller" in fld_lower or "documents required from seller" in desc_lower:
+                c.requirement_type = "INFORMATIONAL"
                 decomposed.append(c)
                 combined_text = (desc + " " + val_str).lower()
                 if "oem annual turnover" in combined_text:
@@ -436,41 +438,117 @@ class TenderRequirementExtractor:
 
         return decomposed
 
+    def _is_administrative_or_process_item(self, c: CandidateRequirement) -> Tuple[bool, str]:
+        """
+        Deterministically checks if a candidate requirement is administrative metadata,
+        process condition, or general policy disclaimer rather than an actionable bidder obligation.
+        Returns (is_admin, canonical_req_type).
+        """
+        fld_lower = (c.field or "").lower()
+        desc_lower = (c.description or "").lower()
+        sc_lower = (c.source_clause or "").lower()
+        combined = f"{fld_lower} {desc_lower} {sc_lower}"
+
+        # 1. Administrative / Informational Metadata
+        info_keywords = [
+            "ministry", "department", "organisation", "organization", "office name",
+            "grievance redressal", "item category", "bid number", "dated", "bid document date",
+            "estimated bid value"
+        ]
+        if any(k in combined for k in info_keywords):
+            return True, "INFORMATIONAL"
+
+        # 2. Process Conditions
+        process_keywords = [
+            "bid end date", "bid opening date", "bid offer validity", "reverse auction",
+            "two packet", "auto extension", "auto-extension", "auto_extension",
+            "clarification window", "technical clarifications", "evaluation method",
+            "bid splitting", "option clause", "consignee delivery", "prohibition on"
+        ]
+        if any(k in combined for k in process_keywords):
+            return True, "PROCESS_CONDITION"
+
+        # 3. General Policies / Disclaimers / Legal clauses
+        policy_keywords = [
+            "mse relaxation", "startup relaxation", "traders are excluded",
+            "arbitration clause", "mediation clause", "breach of contract",
+            "null & void", "null and void", "service level agreement", "sla conditions"
+        ]
+        if any(k in combined for k in policy_keywords):
+            return True, "GENERAL_POLICY"
+
+        return False, c.requirement_type or "BIDDER_COMPLIANCE"
+
     def _merge_and_deduplicate_candidates(self, candidates: List[CandidateRequirement]) -> List[CandidateRequirement]:
+        from backend.core.ontology import resolve_field
         merged: List[CandidateRequirement] = []
 
         for c in candidates:
+            # 1. Enforce strict administrative / process classification
+            is_admin, corrected_type = self._is_administrative_or_process_item(c)
+            if is_admin:
+                c.requirement_type = corrected_type
+
             c_blocks = set(c.evidence_block_ids or [])
             c_fld = re.sub(r"[_\s\-]+", "", str(c.field or "").lower())
             c_val = re.sub(r"[_\s\-]+", "", str(c.expected_value or "").lower())
+            c_ont = resolve_field(c.field)
+            c_cid = c_ont.canonical_field_id if c_ont.resolution_status == "RESOLVED" else None
 
             matched_idx = -1
             for idx, existing in enumerate(merged):
                 e_blocks = set(existing.evidence_block_ids or [])
                 e_fld = re.sub(r"[_\s\-]+", "", str(existing.field or "").lower())
                 e_val = re.sub(r"[_\s\-]+", "", str(existing.expected_value or "").lower())
+                e_ont = resolve_field(existing.field)
+                e_cid = e_ont.canonical_field_id if e_ont.resolution_status == "RESOLVED" else None
 
-                # Exact match on field and expected value with block overlap (or if either has no blocks)
-                if c_fld and e_fld and c_fld == e_fld and c_val == e_val:
-                    if not c_blocks or not e_blocks or bool(c_blocks.intersection(e_blocks)):
-                        matched_idx = idx
-                        break
-
-                # Also match if exact block set, field, and value match
-                if c_blocks and e_blocks and c_blocks == e_blocks and c_fld == e_fld and c_val == e_val:
+                # Rule A: Canonical field match (same underlying procurement parameter)
+                if c_cid and e_cid and c_cid == e_cid:
                     matched_idx = idx
                     break
+
+                # Rule B: Exact field and value match (with block overlap or no blocks)
+                if c_fld and e_fld and c_fld == e_fld and c_val == e_val:
+                    matched_idx = idx
+                    break
+
+                # Rule C: Bilingual or block duplicate (shared blocks with keyword overlap)
+                if c_blocks and e_blocks and bool(c_blocks.intersection(e_blocks)):
+                    c_words = set(re.findall(r"\b[a-z]{4,}\b", (c.description or "").lower()))
+                    e_words = set(re.findall(r"\b[a-z]{4,}\b", (existing.description or "").lower()))
+                    if c_words and e_words and len(c_words.intersection(e_words)) >= 2:
+                        matched_idx = idx
+                        break
 
             if matched_idx >= 0:
                 existing = merged[matched_idx]
                 if not existing.mandatory and c.mandatory:
                     existing.mandatory = True
-                if existing.requirement_type != "BIDDER_COMPLIANCE" and c.requirement_type == "BIDDER_COMPLIANCE":
-                    existing.requirement_type = "BIDDER_COMPLIANCE"
+
+                # Requirement type preservation: administrative/process items should never be promoted to BIDDER_COMPLIANCE
+                is_admin_exist, _ = self._is_administrative_or_process_item(existing)
+                is_admin_c, _ = self._is_administrative_or_process_item(c)
+
+                if is_admin_exist or is_admin_c:
+                    if not is_admin_exist and is_admin_c:
+                        existing.requirement_type = c.requirement_type
+                else:
+                    if c.requirement_type == "BIDDER_COMPLIANCE" or existing.requirement_type == "BIDDER_COMPLIANCE":
+                        existing.requirement_type = "BIDDER_COMPLIANCE"
+
+                # Prefer more detailed / cleaner description
                 if len(c.description or "") > len(existing.description or ""):
                     existing.description = c.description
                 if not existing.source_clause and c.source_clause:
                     existing.source_clause = c.source_clause
+
+                # Prefer specific numeric/actionable expected value over generic placeholder
+                if existing.expected_value and any(p in str(existing.expected_value).lower() for p in ["as indicated", "as per", "bid document"]):
+                    if c.expected_value and not any(p in str(c.expected_value).lower() for p in ["as indicated", "as per", "bid document"]):
+                        existing.expected_value = c.expected_value
+
+                # Merge evidence blocks
                 for b in (c.evidence_block_ids or []):
                     if b not in existing.evidence_block_ids:
                         existing.evidence_block_ids.append(b)
@@ -555,6 +633,21 @@ class TenderRequirementExtractor:
             dur_val, u = normalize_duration(val_str)
             if dur_val is not None:
                 return int(dur_val), u or "MONTHS"
+
+        # Experience duration
+        if field_name and "experience" in field_name.lower():
+            dur_val, u = normalize_duration(val_str, target_unit="YEARS")
+            if dur_val is not None:
+                return float(dur_val), u or "YEARS"
+            num_val, u = normalize_numeric(val_str)
+            if num_val is not None:
+                return float(num_val), u or "YEARS"
+
+        # Percentage (past performance, ePBG, local content)
+        if field_name and ("percentage" in field_name.lower() or "percent" in field_name.lower() or "%" in val_str):
+            num_val, u = normalize_numeric(val_str)
+            if num_val is not None:
+                return float(num_val), "%"
 
         # Numeric / delivery days
         if field_name and "delivery" in field_name.lower():

@@ -134,6 +134,19 @@ class ComplianceScoringEngine:
         has_mandatory_missing = False
 
         for req in requirements:
+            # Check requirement type - non-bidder requirements do not affect bidder score
+            req_type = getattr(req, "requirement_type", "")
+            if not req_type and req.applicability and isinstance(req.applicability, dict):
+                req_type = req.applicability.get("requirement_type", "")
+            req_type = str(req_type).upper()
+
+            v_res = results_by_req.get(req.requirement_id)
+            v_status = (v_res.status.upper() if isinstance(v_res.status, str) else v_res.status.value) if v_res else ""
+
+            if req_type in ("PROCESS_CONDITION", "INFORMATIONAL", "GENERAL_POLICY") or v_status in ("N/A", "N_A"):
+                na_count += 1
+                continue
+
             # 1. Applicability Resolution
             app_res = ApplicabilityEvaluator.evaluate_applicability(req, facts_list, tender_metadata)
             if app_res.status == ApplicabilityStatus.NOT_APPLICABLE:
@@ -141,7 +154,6 @@ class ComplianceScoringEngine:
                 continue
 
             applicable_count += 1
-            v_res = results_by_req.get(req.requirement_id)
             if not v_res:
                 # No result -> treated as missing
                 missing_count += 1

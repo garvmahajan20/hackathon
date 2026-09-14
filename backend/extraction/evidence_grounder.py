@@ -101,11 +101,19 @@ def verify_fact_support(
             if tokens:
                 matched = [t for t in tokens if t in text_lower]
                 if len(matched) == len(tokens):
-                    # Check for explicit negation
-                    if re.search(r"\b(not|unauthorized|non-compliant|ineligible|rejected|disqualified)\b", text_lower):
+                    # Check for explicit negative status (excluding valid declarations like "not from a country sharing", "not debarred", "not blacklisted")
+                    neg_match = re.search(r"\b(unauthorized|non-compliant|ineligible|rejected|disqualified)\b", text_lower)
+                    if not neg_match and re.search(r"\bnot\s+(?:compliant|eligible|authorized|accepted)\b", text_lower):
+                        neg_match = True
+                    if neg_match:
                         return False, "NEGATED_BOOLEAN", [f"Evidence text explicitly negates claim '{field_name}'."]
                     return True, "BOOLEAN_AFFIRMED", []
                 elif len(matched) > 0 and (len(matched) / len(tokens)) >= 0.5:
+                    neg_match = re.search(r"\b(unauthorized|non-compliant|ineligible|rejected|disqualified)\b", text_lower)
+                    if not neg_match and re.search(r"\bnot\s+(?:compliant|eligible|authorized|accepted)\b", text_lower):
+                        neg_match = True
+                    if neg_match:
+                        return False, "NEGATED_BOOLEAN", [f"Evidence text explicitly negates claim '{field_name}'."]
                     return True, "BOOLEAN_PARTIAL_AFFIRMED", []
                 else:
                     return False, "BOOLEAN_UNSUPPORTED", [f"Claim '{field_name}={raw_value}' has no supporting keywords in cited text."]

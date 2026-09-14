@@ -138,11 +138,12 @@ class DocumentIngestionPipeline:
                 for b_idx, b in enumerate(raw_blocks):
                     x0, y0, x1, y1, b_text, b_no, b_type = b[:7]
                     contract_bbox = convert_pymupdf_to_contract_bbox(x0, y0, x1, y1, width, height)
+                    clean_b_text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", b_text).strip()
                     blocks.append(TextBlock(
                         block_id=f"{doc_id}-p{page_num}-b{b_idx}",
                         page_number=page_num,
-                        text=b_text.strip(),
-                        raw_text=b_text,
+                        text=clean_b_text,
+                        raw_text=clean_b_text,
                         bbox=contract_bbox,
                         block_type=int(b_type),
                         confidence=0.98 if b_type == 0 else 0.85,

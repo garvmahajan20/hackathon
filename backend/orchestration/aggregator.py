@@ -83,12 +83,12 @@ class VerificationAggregator:
                 review_count += 1
             elif r.status in ("PASS", "OVERRIDDEN_PASS"):
                 pass_count += 1
-            elif r.status == "N_A":
+            elif r.status in ("N_A", "N/A"):
                 na_count += 1
 
             # Route compliance items requiring review (unless already adjudicated)
             has_officer_override = bool(r.officer_override and r.officer_override.get("decision"))
-            if (r.requires_human_review or r.status in ["REVIEW", "PARTIAL", "MISSING"]) and not has_officer_override:
+            if r.status not in ("N_A", "N/A") and (r.requires_human_review or r.status in ["REVIEW", "PARTIAL", "MISSING"]) and not has_officer_override:
                 review_idx += 1
                 cat = ReviewCategory.MISSING_EVIDENCE.value if r.status == "MISSING" else ReviewCategory.AMBIGUOUS_COMPLIANCE.value
                 human_review_items.append(HumanReviewItem(

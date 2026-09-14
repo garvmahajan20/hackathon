@@ -253,11 +253,11 @@ def build_pass_bidder(output_path):
         fitz.Rect(36, 230, 559, 320),
         "2. Performance Security (ePBG) Undertaking",
         [
-            "Tender ePBG Requirement: 3.00% of total contract value for 36 months duration.",
+            "Tender ePBG Requirement: 3.00% of total contract value for 62 months duration.",
             "Commitment: We unequivocally undertake to furnish an Electronic Performance Bank Guarantee (ePBG)",
-            "of exactly 3.00% of the total awarded contract value from State Bank of India valid for 36 months",
+            "of exactly 3.00% of the total awarded contract value from State Bank of India valid for 62 months",
             "within 15 days of contract award as stipulated by the Department of Posts.",
-            "ePBG Commitment: 100% Compliant.",
+            "ePBG Commitment: 100% Compliant | ePBG Percentage: 3.0% | ePBG Duration: 62 Months.",
         ],
         border_color=(0.15, 0.35, 0.55)
     )
@@ -274,6 +274,33 @@ def build_pass_bidder(output_path):
             "to submit bid against GeM Bid No. GEM/2026/B/7959150 for supply of 500 units of our RuggedHandheld Pro-X500.",
             "We further guarantee comprehensive 3-Year Onsite OEM Warranty and spare parts support for the full life cycle.",
             "OEM Authorization: Valid and Verified Manufacturer Authorization Form (MAF).",
+        ],
+        border_color=(0.15, 0.35, 0.55)
+    )
+
+    draw_section_box(
+        p4,
+        fitz.Rect(36, 470, 559, 580),
+        "4. Statutory Labour Law Compliance Undertaking",
+        [
+            "We hereby solemnly declare and certify that Apex Secure Systems Private Limited strictly complies",
+            "with all applicable labour laws, including the four Labour Codes (Code on Wages, Industrial Relations Code,",
+            "Code on Social Security, and Occupational Safety, Health & Working Conditions Code), as well as pre-existing",
+            "enactments including the Minimum Wages Act, 1948 and Payment of Bonus Act, 1965.",
+            "Statutory Labour Law Compliance: Full Compliance Confirmed.",
+        ],
+        border_color=(0.15, 0.35, 0.55)
+    )
+
+    draw_section_box(
+        p4,
+        fitz.Rect(36, 595, 559, 685),
+        "5. Bid Offer Validity & Buyer ATC Acceptance",
+        [
+            "Bid Offer Validity Commitment: We confirm that our technical and commercial offer remains firmly valid",
+            "for 180 Days from the bid end date as stipulated under GeM tender terms.",
+            "Bid Offer Validity: 180 Days (Confirmed and Accepted).",
+            "Buyer ATC Compliance: We accept and comply with all Buyer Additional Terms & Conditions (ATC).",
         ],
         border_color=(0.15, 0.35, 0.55)
     )

@@ -205,9 +205,27 @@ class LLMBidderFactExtractor(BaseFactExtractor):
             if num_val is not None:
                 return int(num_val), u or "DAYS"
 
+        if "experience" in field_name.lower():
+            dur_val, u = normalize_duration(val_str, target_unit="YEARS")
+            if dur_val is not None:
+                return float(dur_val), u or "YEARS"
+            num_val, u = normalize_numeric(val_str)
+            if num_val is not None:
+                return float(num_val), u or "YEARS"
+
+        if "percentage" in field_name.lower() or "percent" in field_name.lower() or "%" in val_str:
+            num_val, u = normalize_numeric(val_str)
+            if num_val is not None:
+                return float(num_val), "%"
+
         # Standard identifiers
         if field_name in ["gstin", "pan", "udyam_number"]:
             return val_str.upper().strip(), None
+
+        from backend.core.normalization import normalize_boolean
+        bool_val = normalize_boolean(val_str)
+        if bool_val is not None and any(k in field_name.lower() for k in ["compliance", "undertaking", "is_mse", "is_startup"]):
+            return bool_val, "BOOLEAN"
 
         num_val, u = normalize_numeric(val_str)
         if num_val is not None:

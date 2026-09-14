@@ -178,9 +178,13 @@ export const VerificationWorkbenchPage: React.FC = () => {
   }, [verification, loadedDossier]);
 
   // Active state
-  const [selectedClauseId, setSelectedClauseId] = useState<string | null>(
-    verification?.verification_results[0]?.requirement_id || null
-  );
+  const [selectedClauseId, setSelectedClauseId] = useState<string | null>(() => {
+    if (!verification?.verification_results?.length) return null;
+    const firstBidder = verification.verification_results.find(
+      (r) => r.status !== "N/A" && r.status !== "N_A"
+    );
+    return firstBidder?.requirement_id || verification.verification_results[0].requirement_id;
+  });
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [activeEvidence, setActiveEvidence] = useState<EvidenceData | null>(null);
   const [hoveredEvidence, setHoveredEvidence] = useState<EvidenceData | null>(null);
@@ -294,8 +298,11 @@ export const VerificationWorkbenchPage: React.FC = () => {
   // Sync initial evidence when verification or dossier is loaded
   useEffect(() => {
     if (verification?.verification_results && verification.verification_results.length > 0) {
-      const first = verification.verification_results[0];
-      handleSelectClause(first.requirement_id);
+      const firstBidder = verification.verification_results.find(
+        (r) => r.status !== "N/A" && r.status !== "N_A"
+      );
+      const target = firstBidder || verification.verification_results[0];
+      handleSelectClause(target.requirement_id);
     } else {
       setSelectedClauseId(null);
       setSelectedBlockId(null);
@@ -384,10 +391,29 @@ export const VerificationWorkbenchPage: React.FC = () => {
     );
   }
 
-  const passCount = verification.verification_results.filter((r) => r.status === "PASS").length;
-  const failCount = verification.verification_results.filter((r) => r.status === "FAIL").length;
+  const isProcessCondition = (r: VerificationResult) => {
+    const s = (r.status || "").toUpperCase();
+    const rt = (r.requirement_type || "").toUpperCase();
+    const ps = (r.precedence_chain?.status || "").toUpperCase();
+    return (
+      s === "N/A" ||
+      s === "N_A" ||
+      rt === "PROCESS_CONDITION" ||
+      rt === "INFORMATIONAL" ||
+      rt === "GENERAL_POLICY" ||
+      ps === "PROCESS_CONDITION" ||
+      ps === "INFORMATIONAL" ||
+      ps === "GENERAL_POLICY"
+    );
+  };
+
+  const bidderResults = verification.verification_results.filter((r) => !isProcessCondition(r));
+  const processResults = verification.verification_results.filter((r) => isProcessCondition(r));
+
+  const passCount = bidderResults.filter((r) => r.status === "PASS").length;
+  const failCount = bidderResults.filter((r) => r.status === "FAIL").length;
   const reviewCount = verification.human_review_items.length;
-  const missingCount = verification.verification_results.filter((r) => r.status === "MISSING").length;
+  const missingCount = bidderResults.filter((r) => r.status === "MISSING").length;
 
   return (
     <div className="flex flex-col h-[calc(100vh-6rem)] space-y-2.5 font-sans select-none">
@@ -438,34 +464,39 @@ export const VerificationWorkbenchPage: React.FC = () => {
 
       {/* 2. ANALYTICAL SUMMARY RAIL */}
       <div className="bg-white border border-slate-200 rounded-lg px-4 py-1.5 flex items-center justify-between text-xs shrink-0 shadow-2xs">
-        <div className="flex items-center gap-5 font-mono text-[11px]">
-  <div>
-    <span className="text-slate-400 mr-1">EVALUATED:</span>
-    <span className="font-bold text-slate-800">
-      {verification.verification_results.length}
-    </span>
-  </div>
+        <div className="flex items-center gap-4 font-mono text-[11px]">
+          <div>
+            <span className="text-slate-400 mr-1">OBLIGATIONS:</span>
+            <span className="font-bold text-slate-800">
+              {bidderResults.length}
+            </span>
+          </div>
 
-  <div>
-    <span className="text-emerald-600 mr-1 font-bold">● PASS:</span>
-    <span className="font-bold text-emerald-800">{passCount}</span>
-  </div>
+          <div>
+            <span className="text-emerald-600 mr-1 font-bold">● PASS:</span>
+            <span className="font-bold text-emerald-800">{passCount}</span>
+          </div>
 
-  <div>
-    <span className="text-rose-600 mr-1 font-bold">▲ FAILED:</span>
-    <span className="font-bold text-rose-800">{failCount}</span>
-  </div>
+          <div>
+            <span className="text-rose-600 mr-1 font-bold">▲ FAILED:</span>
+            <span className="font-bold text-rose-800">{failCount}</span>
+          </div>
 
-  <div>
-    <span className="text-slate-500 mr-1">○ MISSING:</span>
-    <span className="font-bold text-slate-600">{missingCount}</span>
-  </div>
+          <div>
+            <span className="text-slate-500 mr-1">○ MISSING:</span>
+            <span className="font-bold text-slate-600">{missingCount}</span>
+          </div>
 
-  <div className="border-l border-slate-200 pl-5">
-    <span className="text-amber-600 mr-1 font-bold">◆ OFFICER REVIEW:</span>
-    <span className="font-bold text-amber-800">{reviewCount}</span>
-  </div>
-</div>
+          <div className="border-l border-slate-200 pl-4">
+            <span className="text-amber-600 mr-1 font-bold">◆ REVIEW:</span>
+            <span className="font-bold text-amber-800">{reviewCount}</span>
+          </div>
+
+          <div className="border-l border-slate-200 pl-4">
+            <span className="text-slate-400 mr-1">PROCESS COND:</span>
+            <span className="font-bold text-slate-600">{processResults.length}</span>
+          </div>
+        </div>
 
         <div className="flex items-center gap-1">
           <button

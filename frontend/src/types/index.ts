@@ -1,6 +1,6 @@
 // Canonical domain types matching backend contracts strictly
 
-export type ComplianceStatus = "PASS" | "FAIL" | "PARTIAL" | "MISSING" | "REVIEW";
+export type ComplianceStatus = "PASS" | "FAIL" | "PARTIAL" | "MISSING" | "REVIEW" | "N/A" | "N_A";
 
 export type IntegrityStatus = "CONSISTENT" | "CONTRADICTION" | "REVIEW" | "INCOMPLETE";
 
@@ -42,6 +42,7 @@ export interface VerificationResult {
   requires_human_review: boolean;
   evidence: EvidencePointer[];
   anomaly_refs?: string[];
+  requirement_type?: string;
   precedence_chain?: {
     status: string;
     superseded_by?: string;

@@ -271,6 +271,7 @@ class VerificationResult:
     anomaly_refs: List[str] = dc_field(default_factory=list)
     officer_override: Optional[Dict[str, Any]] = None
     precedence_chain: Optional[Dict[str, Any]] = None
+    requirement_type: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         ev_list = [e.to_dict() if hasattr(e, "to_dict") else e for e in self.evidence]
@@ -293,6 +294,10 @@ class VerificationResult:
             d["anomaly_refs"] = self.anomaly_refs
         if self.officer_override is not None:
             d["officer_override"] = self.officer_override
+        if self.precedence_chain is not None:
+            d["precedence_chain"] = self.precedence_chain
+        if self.requirement_type is not None:
+            d["requirement_type"] = self.requirement_type
         return d
 
     @classmethod
@@ -313,4 +318,5 @@ class VerificationResult:
             anomaly_refs=data.get("anomaly_refs", []),
             officer_override=data.get("officer_override"),
             precedence_chain=data.get("precedence_chain"),
+            requirement_type=data.get("requirement_type"),
         )
