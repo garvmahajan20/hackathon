@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import json
 import os
+import re
 import time
 from typing import Any, Dict, Optional
 
@@ -111,7 +112,12 @@ class GeminiProvider(BaseLLMProvider):
                     break
 
             except Exception as e:
-                last_error = f"Network or execution error: {str(e)}"
+                # requests/http client exceptions may echo the complete request
+                # URL.  Gemini authenticates with a query parameter, so retain
+                # the useful failure text while ensuring neither logs nor an
+                # eventual API error can contain a credential.
+                safe_error = re.sub(r"([?&]key=)[^&\s)]+", r"\1[REDACTED]", str(e), flags=re.IGNORECASE)
+                last_error = f"Network or execution error: {safe_error}"
                 if attempt < self._max_retries:
                     time.sleep(1.0 * (attempt + 1))
                     continue

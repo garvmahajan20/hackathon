@@ -508,7 +508,13 @@ class VerificationOrchestrator:
             return aggregated, dossier
 
         except Exception as exc:
-            notify_progress(current_step, "FAILED", f"Stage {current_step} failed: {str(exc)}")
+            # Progress events are client-visible.  Provider exceptions can
+            # contain transport details, so never serialize them to SSE.
+            if isinstance(exc, LLMProviderError):
+                failure_message = f"Stage {current_step} failed: live provider request failed."
+            else:
+                failure_message = f"Stage {current_step} failed: {str(exc)}"
+            notify_progress(current_step, "FAILED", failure_message)
             raise
 
     def get_verification(self, verification_id: str) -> Optional[AggregatedVerification]:

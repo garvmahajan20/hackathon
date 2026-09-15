@@ -98,6 +98,11 @@ def get_orchestrator(mode_str: Optional[str] = None) -> VerificationOrchestrator
         _orchestrators[effective_mode] = VerificationOrchestrator(mode=llm_mode)
     return _orchestrators[effective_mode]
 
+
+def _public_provider_error() -> str:
+    """Return a useful, non-sensitive provider failure for HTTP/SSE clients."""
+    return "Live verification provider failure. Check provider availability and server diagnostics."
+
 _orchestrator = get_orchestrator("LIVE")
 
 @app.exception_handler(HTTPException)
@@ -240,7 +245,7 @@ async def verify_bid(
         except LLMProviderError as lpe:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Live verification provider failure: {str(lpe)}",
+                detail=_public_provider_error(),
             )
         except ValueError as ve:
             raise HTTPException(
@@ -321,7 +326,7 @@ async def verify_bid_stream(
         except LLMProviderError as lpe:
             loop.call_soon_threadsafe(
                 queue.put_nowait,
-                {"event": "VERIFICATION_FAILED", "error": f"Live verification provider failure: {str(lpe)}"},
+                {"event": "VERIFICATION_FAILED", "error": _public_provider_error()},
             )
         except Exception as exc:
             logger.exception("Error during streamed verification")
