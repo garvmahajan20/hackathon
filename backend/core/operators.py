@@ -193,6 +193,17 @@ def evaluate_in(actual: Any, expected: Any, field_name: str = "") -> OperatorRes
     if actual is None:
         return OperatorResult(ComplianceStatus.FAIL, "Actual value is missing for 'IN' check.")
 
+    exp_str_lower = str(expected).lower()
+    if "class" in exp_str_lower and "%" not in exp_str_lower:
+        num_act, _ = normalize_numeric(actual)
+        if num_act is not None:
+            inferred_class = "class 1" if num_act >= 50 else ("class 2" if num_act >= 20 else "non-local")
+            candidates_raw = [x.strip().lower() for x in exp_str_lower.split(",")]
+            class_map = {"class i": "class 1", "class-i": "class 1", "class ii": "class 2", "class-ii": "class 2"}
+            candidates_clean = [class_map.get(c, c) for c in candidates_raw]
+            if inferred_class in candidates_clean:
+                return OperatorResult(ComplianceStatus.PASS, f"Actual percentage ({num_act}%) qualifies as '{inferred_class}' which is in approved list ({expected}).")
+
     act_cat = normalize_categorical(actual)
 
     # Expected could be a list, set, or comma-separated string

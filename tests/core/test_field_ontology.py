@@ -161,6 +161,17 @@ class TestCanonicalFieldOntology(unittest.TestCase):
         self.assertEqual(res2.canonical_field_id, "ANNUAL_TURNOVER")
         self.assertEqual(res3.canonical_field_id, "ANNUAL_TURNOVER")
 
+    def test_09b_gem_minimum_average_turnover_schema_fields_canonicalize(self):
+        """Requirement extractor fields must match the bidder financial facts."""
+        self.assertEqual(
+            resolve_field("bidder_min_avg_annual_turnover").canonical_field_id,
+            "AVERAGE_ANNUAL_TURNOVER",
+        )
+        self.assertEqual(
+            resolve_field("oem_min_avg_annual_turnover").canonical_field_id,
+            "OEM_AVERAGE_TURNOVER",
+        )
+
     def test_10_raw_field_name_remains_preserved(self):
         raw = "My_Custom_Vendor_Annual_Turnover_Claim"
         res = resolve_field(raw)

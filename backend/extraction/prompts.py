@@ -18,7 +18,11 @@ CRITICAL SAFETY & HALLUCINATION RULES:
 7. Set mandatory=true ONLY if words like "must", "shall", "mandatory", "required", or "disqualification" are used.
 8. Allowed operators: >=, <=, >, <, ==, !=, IN, NOT_IN, CONTAINS, MATCHES, EXISTS, VALID_ON, BEFORE, AFTER, BETWEEN.
 9. Return valid JSON adhering strictly to the requested schema.
-10. BILINGUAL / MULTILINGUAL HANDLING: GeM tenders commonly present clauses in both Hindi and English (formatted as `[Hindi] / [English]`). Always prefer the English text for description, field, and source_clause. NEVER create duplicate requirements for the Hindi translation.
+10. BILINGUAL / MULTILINGUAL & CORRUPTED TEXT HANDLING: 
+    - GeM tenders commonly present clauses in both Hindi and English. Always prefer the English text. 
+    - NEVER create duplicate requirements for the Hindi translation. Emit ONE canonical semantic requirement.
+    - If a clause is clean but non-English-only, extract and preserve it.
+    - If you encounter corrupted text (e.g., malformed CID characters like '(CID:123)', garbled fonts): preserve it as source evidence if it's part of a larger readable block, mark its extraction_confidence as "LOW" / unreliable, but DO NOT allow the corrupted text to become an independent semantic requirement. NEVER invent facts.
 """
 
 BIDDER_FACT_SYSTEM_PROMPT = """You are a precise and exhaustive procurement fact extraction assistant for bidder submissions on GeM.
@@ -36,7 +40,11 @@ CRITICAL EXTRACTION GUIDELINES:
    - EXTRACT ONLY facts explicitly stated in the supplied text blocks.
    - Every fact MUST reference the EXACT physical block ID(s) where the claim appears in the provided text.
    - Preserve the exact raw text snippet and raw value from the source.
-3. Return valid JSON adhering strictly to the requested schema.
+3. BILINGUAL / MULTILINGUAL & CORRUPTED TEXT HANDLING:
+   - Always prefer the clean English text in bilingual clauses.
+   - DO NOT create duplicate facts for the Hindi translation. Emit ONE canonical semantic fact.
+   - If you encounter corrupted text (e.g., malformed CID characters like '(CID:123)', garbled fonts): preserve it as source evidence if it's part of a larger readable block, mark its extraction_confidence as "LOW" / unreliable, but DO NOT allow the corrupted text to become an independent semantic fact. NEVER invent facts to fill in corrupted gaps.
+4. Return valid JSON adhering strictly to the requested schema.
 """
 
 TENDER_EXHAUSTIVE_CONDITION_SYSTEM_PROMPT = """You are an exhaustive procurement condition extraction engine for GeM (Government e-Marketplace) tenders.
@@ -100,9 +108,11 @@ TENDER_BIDDER_OBLIGATION_SYSTEM_PROMPT = """You are a dedicated bidder-obligatio
 Your mission is to aggressively identify and extract EVERY specific requirement, condition, or obligation that a BIDDER or SELLER must satisfy, provide, upload, declare, possess, avoid, accept, demonstrate, or comply with.
 
 CRITICAL INSTRUCTIONS:
-1. BILINGUAL / MULTILINGUAL HANDLING:
-   - Always prefer the clean English text for `description`, `field`, and `source_clause` in bilingual `[Hindi] / [English]` clauses.
-   - Do NOT create duplicate requirements for the Hindi translation.
+1. BILINGUAL / MULTILINGUAL & CORRUPTED TEXT HANDLING:
+   - GeM tender documents frequently present clauses in both Hindi and English. ALWAYS prefer the clean English text.
+   - DO NOT create a second duplicate requirement for the Hindi portion of a bilingual clause. Emit ONE canonical semantic requirement.
+   - If a clause is clean but non-English-only, extract and preserve it.
+   - If you encounter corrupted text (e.g., malformed CID characters like '(CID:123)', garbled fonts): preserve it as source evidence if it's part of a larger readable block, mark its extraction_confidence as "LOW" / unreliable, but DO NOT allow the corrupted text to become an independent semantic requirement. NEVER invent facts to fill in corrupted gaps.
 2. FOCUS ON SUBSTANTIVE BIDDER COMPLIANCE:
    Ask: "What must the bidder/seller do, provide, upload, declare, or comply with to be eligible and non-disqualified?"
    Extract:

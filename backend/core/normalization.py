@@ -269,10 +269,21 @@ def normalize_boolean(value: Any) -> Optional[bool]:
         return None
 
     cleaned = value.strip().lower()
-    if cleaned in ["true", "yes", "y", "1", "required", "submitted", "available", "valid", "compliant"]:
-        return True
-    if cleaned in ["false", "no", "n", "0", "not required", "exempted", "not available", "invalid", "non-compliant", "na", "n/a"]:
+    
+    # Negative matches first
+    if cleaned in ["false", "no", "n", "0", "not required", "exempted", "not available", "invalid", "non-compliant", "na", "n/a", "none"]:
         return False
+    if "not " in cleaned or "non " in cleaned:
+        # e.g., "not an mse", "not applicable"
+        return False
+
+    # Positive matches
+    if cleaned in ["true", "yes", "y", "1", "required", "submitted", "available", "valid", "compliant", "applicable", "provided"]:
+        return True
+    
+    # Domain specific positive indicators
+    if "mse" in cleaned or "micro" in cleaned or "small enterprise" in cleaned or "startup" in cleaned or "dpiit" in cleaned or "compliant" in cleaned:
+        return True
 
     # Affirmative / negative phrase patterns for declarations and undertakings
     if any(neg in cleaned for neg in ["not compliant", "non-compliant", "non compliant", "does not comply", "ineligible", "failed to"]):

@@ -155,6 +155,9 @@ CANONICAL_FIELDS: List[CanonicalField] = [
             "three_year_average_turnover",
             "aat",
             "bidder_average_annual_turnover",
+            # GeM extractor schema form: same three-year bidder turnover
+            # concept, not a distinct financial metric.
+            "bidder_min_avg_annual_turnover",
             "bidder_minimum_average_annual_turnover",
             "bidder_turnover_requirement",
             "bidder_turnover",
@@ -164,6 +167,7 @@ CANONICAL_FIELDS: List[CanonicalField] = [
             "minimum_average_annual_financial_turnover_of_the_bidder",
             "turnover_document",
             "bidder_turnover_documentary_evidence",
+            "bidder_turnover_proof",
             "turnover_certificate",
             "audited_balance_sheet",
         ],
@@ -179,6 +183,9 @@ CANONICAL_FIELDS: List[CanonicalField] = [
         aliases=[
             "oem_average_turnover",
             "oem_average_annual_turnover",
+            # GeM extractor schema form: same three-year OEM turnover
+            # concept, not a distinct financial metric.
+            "oem_min_avg_annual_turnover",
             "oem_turnover_requirement",
             "oem_turnover",
             "oem_annual_turnover",
@@ -378,8 +385,10 @@ CANONICAL_FIELDS: List[CanonicalField] = [
             "msme_status",
             "is_msme",
             "mse_status",
+            "mse_purchase_preference",
             "exemption_supporting_documents",
             "mse_exemption_supporting_documents",
+            "enterprise_category",
         ],
         description="MSE statutory eligibility indicator for preferential evaluation.",
     ),
@@ -435,6 +444,7 @@ CANONICAL_FIELDS: List[CanonicalField] = [
             "consignee_delivery_schedule",
             "delivery_schedule",
             "delivery_days_requirement",
+            "delivery_period_days",
         ],
         description="Contract delivery schedule or lead time in days.",
     ),
@@ -463,6 +473,7 @@ CANONICAL_FIELDS: List[CanonicalField] = [
             "mii_local_content_certificate",
             "mii_local_content_oem_certificate",
             "local_content_certificate",
+            "mii_supplier_class_restriction",
         ],
         description="Percentage of domestic value addition declared under Public Procurement Order.",
     ),
@@ -603,6 +614,7 @@ CANONICAL_FIELDS: List[CanonicalField] = [
         aliases=[
             "experience_years",
             "years_of_experience",
+            "past_experience",
             "past_experience_years",
             "industry_experience_years",
             "bidder_or_oem_experience_years",
