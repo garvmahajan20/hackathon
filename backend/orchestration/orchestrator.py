@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, timezone
 import hashlib
 import json
@@ -375,27 +376,42 @@ class VerificationOrchestrator:
             else:
                 all_calls_fresh = False
 
+            run_id = f"RUN-{uuid.uuid4().hex[:8].upper()}"
+            t_sha = hashlib.sha256(open(tender_document_path, "rb").read()).hexdigest()
+            b_shas = [hashlib.sha256(open(p, "rb").read()).hexdigest() for p in bid_document_paths] if bid_document_paths else []
+
             diagnostic_telemetry = {
-                "request_start_timestamp": request_start_timestamp,
-                "request_end_timestamp": request_end_timestamp,
-                "total_backend_elapsed_ms": round(total_time_ms, 2),
-                "number_of_gemini_provider_calls": total_gemini_calls,
-                "tender_requirement_gemini_call_count": tender_req_calls,
-                "bidder_fact_gemini_call_count": bidder_fact_calls,
-                "whether_every_call_was_fresh": all_calls_fresh,
+                "run_id": run_id,
                 "verification_id": f"VERIF-{tender_id}-{bid_id}",
+                "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
+                "provider": self.provider.provider_name if hasattr(self.provider, 'provider_name') else str(self.provider.__class__.__name__),
+                "model": getattr(self.provider, "model_name", "unknown"),
+                "tender_sha256": t_sha,
+                "bidder_sha256": b_shas[0] if b_shas else "",
+                "cache_policy": cache_policy_label,
+                "cache_reads": getattr(self.llm_cache, "reads", 0) if hasattr(self, "llm_cache") else 0,
+                "cache_hits": getattr(self.llm_cache, "hits", 0) if hasattr(self, "llm_cache") else 0,
+                "cache_writes": getattr(self.llm_cache, "writes", 0) if hasattr(self, "llm_cache") else 0,
+                "llm_calls": total_gemini_calls,
+                "llm_latencies": [c.get("latency_ms", 0) for c in recent_calls] if total_gemini_calls > 0 else [],
+                "extraction_source": extraction_source,
+                "started_at": request_start_timestamp,
+                "completed_at": request_end_timestamp,
+                "total_elapsed_ms": round(total_time_ms, 2),
+                "requirements_extracted": len(requirements),
+                "facts_extracted": len(all_facts),
+                "whether_every_call_was_fresh": all_calls_fresh,
                 "stage3_start_timestamp": stage3_start_timestamp,
                 "stage3_end_timestamp": stage3_end_timestamp,
                 "stage3_elapsed_ms": round(stage3_elapsed_ms, 2),
                 "stage4_start_timestamp": stage4_start_timestamp,
                 "stage4_end_timestamp": stage4_end_timestamp,
                 "stage4_elapsed_ms": round(stage4_elapsed_ms, 2),
-                "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
             }
 
             extraction_meta = {
                 "mode": self.mode.value if hasattr(self.mode, 'value') else str(self.mode),
-                "model": self.provider.model_name,
+                "model": getattr(self.provider, "model_name", "unknown"),
                 "latency_ms": total_time_ms,
                 "extraction_source": extraction_source,
                 "cache_policy": cache_policy_label,
