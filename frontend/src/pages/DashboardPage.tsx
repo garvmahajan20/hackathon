@@ -506,8 +506,14 @@ export const DashboardPage: React.FC = () => {
 
         <div className="divide-y divide-slate-100">
           {displayVerifications.slice(0, 15).map((v) => {
+            const DEMO_COMPANY_MAP: Record<string, string> = {
+              JARVIS_DEMO_PASS_BIDDER: "Apex Technologies Pvt Ltd (Clean Pass)",
+              JARVIS_DEMO_FAIL_BIDDER: "Apex Infrastructure Ltd (Failed Turnover/Experience)",
+              JARVIS_DEMO_FORENSIC_BIDDER: "Apex Global Dynamics (Forensic Inconsistencies)",
+            };
             const demo = CANONICAL_DEMO_CASES.find((d) => d.bid_id === v.bid_id);
             const companyName =
+              DEMO_COMPANY_MAP[v.bid_id] ||
               demo?.company_name ||
               (v.processing_metadata as any)?.company_name ||
               (v.processing_metadata as any)?.legal_name ||

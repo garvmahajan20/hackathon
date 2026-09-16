@@ -3940,7 +3940,7 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FAIL_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FAIL_BIDDER-REQ-GEM/2026/B/7959150-009",
-      "created_at": "2026-09-16T11:14:06Z",
+      "created_at": "2026-09-16T12:36:33Z",
       "status": "OPEN"
     },
     {
@@ -3955,15 +3955,15 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FAIL_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FAIL_BIDDER-REQ-GEM/2026/B/7959150-010",
-      "created_at": "2026-09-16T11:14:06Z",
+      "created_at": "2026-09-16T12:36:33Z",
       "status": "OPEN"
     }
   ],
   "audit_metadata": {
     "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FAIL_BIDDER",
     "deterministic_run_id": "RUN-84F0B5BC7BC5",
-    "generated_at": "2026-09-16T11:14:06Z",
-    "processing_time_ms": 233.61959999601822,
+    "generated_at": "2026-09-16T12:36:33Z",
+    "processing_time_ms": 459.13719999953173,
     "active_model": "gemini-3.8-flash",
     "extraction_mode": "CACHED"
   },

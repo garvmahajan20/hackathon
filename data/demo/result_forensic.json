@@ -4,7 +4,7 @@
   "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
   "overall_status": "REVIEW",
   "compliance_status": "MISSING",
-  "integrity_status": "CONSISTENT",
+  "integrity_status": "CONTRADICTION",
   "verification_results": [
     {
       "verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-001",
@@ -44,14 +44,29 @@
       "verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-002",
       "requirement_id": "REQ-GEM/2026/B/7959150-002",
       "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
-      "status": "MISSING",
-      "severity": "CRITICAL",
+      "status": "PASS",
+      "severity": "INFO",
       "expected": ">= 100 Lakh (s) INR",
-      "actual": "MISSING",
+      "actual": "INR 145.00 Lakhs INR",
       "operator_used": ">=",
-      "reason": "No bidder evidence submitted for 'bidder_average_annual_turnover'.",
-      "evidence": [],
-      "requires_human_review": true,
+      "reason": "Actual value (14500000.0) meets or exceeds threshold (10000000.0).",
+      "evidence": [
+        {
+          "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+          "page": 1,
+          "bbox": [
+            296.86,
+            46.0,
+            308.54,
+            242.54
+          ],
+          "snippet": "Bidder Average Annual Turnover: INR 145.00 Lakhs",
+          "source_type": "NATIVE_PDF_SEMANTIC",
+          "block_id": "DOC-JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150-p1-b15"
+        }
+      ],
+      "requires_human_review": false,
+      "fact_id": "FACT-JARVIS_DEMO_FORENSIC_BIDDER-BIDDER_AVERAGE_ANNUAL_TURNOVER_DECLARED-008",
       "precedence_chain": {
         "status": "EFFECTIVE",
         "source_type": "UNSPECIFIED",
@@ -199,14 +214,29 @@
       "verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-007",
       "requirement_id": "REQ-GEM/2026/B/7959150-007",
       "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
-      "status": "MISSING",
-      "severity": "CRITICAL",
+      "status": "PASS",
+      "severity": "INFO",
       "expected": ">= 80 % %",
-      "actual": "MISSING",
+      "actual": "450 Units COUNT",
       "operator_used": ">=",
-      "reason": "No bidder evidence submitted for 'past_performance_percentage'.",
-      "evidence": [],
-      "requires_human_review": true,
+      "reason": "Actual value (450) meets or exceeds threshold (80.0).",
+      "evidence": [
+        {
+          "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+          "page": 3,
+          "bbox": [
+            199.86,
+            46.0,
+            211.54,
+            380.48
+          ],
+          "snippet": "Past Performance Quantity: 450 Units of handheld rugged terminals to Northern Railway.",
+          "source_type": "NATIVE_PDF_SEMANTIC",
+          "block_id": "DOC-JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150-p3-b10"
+        }
+      ],
+      "requires_human_review": false,
+      "fact_id": "FACT-JARVIS_DEMO_FORENSIC_BIDDER-PAST_PERFORMANCE_QUANTITY_CLAIMED-024",
       "precedence_chain": {
         "status": "EFFECTIVE",
         "source_type": "UNSPECIFIED",
@@ -648,8 +678,8 @@
   "critical_failures": 0,
   "major_failures": 0,
   "review_required": true,
-  "evidence_count": 16,
-  "anomaly_count": 0,
+  "evidence_count": 18,
+  "anomaly_count": 2,
   "government_checks": [
     {
       "status": "NOT_FOUND",
@@ -724,40 +754,87 @@
       "is_mock": true
     }
   ],
-  "contradictions": [],
+  "contradictions": [
+    {
+      "finding_id": "INT-JARVIS_DEMO_FORENSIC_BIDDER-AVERAGE_ANNUAL_TURNOVER-001",
+      "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
+      "finding_type": "TURNOVER_CONTRADICTION",
+      "field": "AVERAGE_ANNUAL_TURNOVER",
+      "severity": "HIGH",
+      "status": "CONTRADICTION",
+      "description": "Financial turnover differs across documents: '14500000.0' vs '4167000.0'. (Comparing raw fields: 'bidder_average_annual_turnover_declared' vs 'bidder_average_annual_turnover_audited', canonical: 'AVERAGE_ANNUAL_TURNOVER')",
+      "value_a": 14500000.0,
+      "value_b": 4167000.0,
+      "evidence_a": {
+        "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+        "page": 1,
+        "bbox": [
+          296.86,
+          46.0,
+          308.54,
+          242.54
+        ],
+        "snippet": "Bidder Average Annual Turnover: INR 145.00 Lakhs"
+      },
+      "evidence_b": {
+        "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+        "page": 2,
+        "bbox": [
+          227.86,
+          46.0,
+          239.54,
+          268.05
+        ],
+        "snippet": "Actual Audited Average Annual Turnover: INR 41.67 Lakhs"
+      },
+      "requires_human_review": true,
+      "source": "CROSS_DOCUMENT_CONTRADICTION_ENGINE",
+      "raw_field_a": "bidder_average_annual_turnover_declared",
+      "raw_field_b": "bidder_average_annual_turnover_audited",
+      "canonical_field": "AVERAGE_ANNUAL_TURNOVER"
+    },
+    {
+      "finding_id": "INT-JARVIS_DEMO_FORENSIC_BIDDER-PAST_PERFORMANCE_PERCENT-002",
+      "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
+      "finding_type": "PAST_PERFORMANCE_CONTRADICTION",
+      "field": "PAST_PERFORMANCE_PERCENT",
+      "severity": "HIGH",
+      "status": "CONTRADICTION",
+      "description": "Past performance supply quantity differs across documents: '450' vs '120'. (Comparing raw fields: 'past_performance_quantity_claimed' vs 'past_performance_quantity_actual', canonical: 'PAST_PERFORMANCE_PERCENT')",
+      "value_a": 450,
+      "value_b": 120,
+      "evidence_a": {
+        "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+        "page": 3,
+        "bbox": [
+          199.86,
+          46.0,
+          211.54,
+          380.48
+        ],
+        "snippet": "Past Performance Quantity: 450 Units of handheld rugged terminals to Northern Railway."
+      },
+      "evidence_b": {
+        "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+        "page": 4,
+        "bbox": [
+          213.86,
+          46.0,
+          225.54,
+          242.53
+        ],
+        "snippet": "Actual Delivered and Completed Quantity: 120 Units"
+      },
+      "requires_human_review": true,
+      "source": "CROSS_DOCUMENT_CONTRADICTION_ENGINE",
+      "raw_field_a": "past_performance_quantity_claimed",
+      "raw_field_b": "past_performance_quantity_actual",
+      "canonical_field": "PAST_PERFORMANCE_PERCENT"
+    }
+  ],
   "human_review_items": [
     {
       "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-001",
-      "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
-      "tender_id": "GEM/2026/B/7959150",
-      "category": "MISSING_EVIDENCE",
-      "severity": "CRITICAL",
-      "reason": "Requirement 'REQ-GEM/2026/B/7959150-002': No bidder evidence submitted for 'bidder_average_annual_turnover'.",
-      "evidence_references": [],
-      "source_documents": [],
-      "source_pages": [],
-      "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
-      "related_verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-002",
-      "created_at": "2026-09-16T11:14:06Z",
-      "status": "OPEN"
-    },
-    {
-      "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-002",
-      "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
-      "tender_id": "GEM/2026/B/7959150",
-      "category": "MISSING_EVIDENCE",
-      "severity": "CRITICAL",
-      "reason": "Requirement 'REQ-GEM/2026/B/7959150-007': No bidder evidence submitted for 'past_performance_percentage'.",
-      "evidence_references": [],
-      "source_documents": [],
-      "source_pages": [],
-      "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
-      "related_verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-007",
-      "created_at": "2026-09-16T11:14:06Z",
-      "status": "OPEN"
-    },
-    {
-      "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-003",
       "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
       "tender_id": "GEM/2026/B/7959150",
       "category": "MISSING_EVIDENCE",
@@ -768,11 +845,11 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-009",
-      "created_at": "2026-09-16T11:14:06Z",
+      "created_at": "2026-09-16T12:36:33Z",
       "status": "OPEN"
     },
     {
-      "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-004",
+      "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-002",
       "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
       "tender_id": "GEM/2026/B/7959150",
       "category": "MISSING_EVIDENCE",
@@ -783,28 +860,116 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-010",
-      "created_at": "2026-09-16T11:14:06Z",
+      "created_at": "2026-09-16T12:36:33Z",
+      "status": "OPEN"
+    },
+    {
+      "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-003",
+      "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
+      "tender_id": "GEM/2026/B/7959150",
+      "category": "INTEGRITY_CONTRADICTION",
+      "severity": "CRITICAL",
+      "reason": "Cross-document contradiction on 'AVERAGE_ANNUAL_TURNOVER': Financial turnover differs across documents: '14500000.0' vs '4167000.0'. (Comparing raw fields: 'bidder_average_annual_turnover_declared' vs 'bidder_average_annual_turnover_audited', canonical: 'AVERAGE_ANNUAL_TURNOVER')",
+      "evidence_references": [
+        {
+          "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+          "page": 1,
+          "bbox": [
+            296.86,
+            46.0,
+            308.54,
+            242.54
+          ],
+          "snippet": "Bidder Average Annual Turnover: INR 145.00 Lakhs"
+        },
+        {
+          "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+          "page": 2,
+          "bbox": [
+            227.86,
+            46.0,
+            239.54,
+            268.05
+          ],
+          "snippet": "Actual Audited Average Annual Turnover: INR 41.67 Lakhs"
+        }
+      ],
+      "source_documents": [
+        "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+        "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf"
+      ],
+      "source_pages": [
+        1,
+        2
+      ],
+      "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
+      "related_verification_id": "INT-JARVIS_DEMO_FORENSIC_BIDDER-AVERAGE_ANNUAL_TURNOVER-001",
+      "created_at": "2026-09-16T12:36:33Z",
+      "status": "OPEN"
+    },
+    {
+      "review_id": "REV-JARVIS_DEMO_FORENSIC_BIDDER-004",
+      "bid_id": "JARVIS_DEMO_FORENSIC_BIDDER",
+      "tender_id": "GEM/2026/B/7959150",
+      "category": "INTEGRITY_CONTRADICTION",
+      "severity": "CRITICAL",
+      "reason": "Cross-document contradiction on 'PAST_PERFORMANCE_PERCENT': Past performance supply quantity differs across documents: '450' vs '120'. (Comparing raw fields: 'past_performance_quantity_claimed' vs 'past_performance_quantity_actual', canonical: 'PAST_PERFORMANCE_PERCENT')",
+      "evidence_references": [
+        {
+          "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+          "page": 3,
+          "bbox": [
+            199.86,
+            46.0,
+            211.54,
+            380.48
+          ],
+          "snippet": "Past Performance Quantity: 450 Units of handheld rugged terminals to Northern Railway."
+        },
+        {
+          "document": "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+          "page": 4,
+          "bbox": [
+            213.86,
+            46.0,
+            225.54,
+            242.53
+          ],
+          "snippet": "Actual Delivered and Completed Quantity: 120 Units"
+        }
+      ],
+      "source_documents": [
+        "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf",
+        "JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf"
+      ],
+      "source_pages": [
+        3,
+        4
+      ],
+      "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
+      "related_verification_id": "INT-JARVIS_DEMO_FORENSIC_BIDDER-PAST_PERFORMANCE_PERCENT-002",
+      "created_at": "2026-09-16T12:36:33Z",
       "status": "OPEN"
     }
   ],
-  "generated_at": "2026-09-16T11:14:06Z",
-  "deterministic_run_id": "RUN-6551A3F00F6E",
+  "generated_at": "2026-09-16T12:36:33Z",
+  "deterministic_run_id": "RUN-3ED64FCC6632",
   "processing_metadata": {
     "debarred": false,
     "debarment_reason": null,
     "total_compliance_checks": 21,
-    "passed_compliance_checks": 3,
-    "contradiction_findings": 0,
+    "passed_compliance_checks": 5,
+    "contradiction_findings": 2,
     "government_checks_run": 5,
     "extraction_mode": "CACHED",
     "active_model": "gemini-3.8-flash",
     "extraction_source": "CACHED",
     "cache_policy": "USE_CACHE",
-    "latency_ms": 229.73590000765398,
+    "latency_ms": 522.9535999969812,
     "requirement_source": "CACHED",
     "fact_source": "CACHED",
     "diagnostic_telemetry": {
-      "run_id": "RUN-1D10D603",
+      "run_id": "RUN-CC9B1F59",
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "mode": "CACHED",
       "provider": "Gemini",
@@ -818,54 +983,38 @@
       "llm_calls": 0,
       "llm_latencies": [],
       "extraction_source": "CACHED",
-      "request_start_timestamp": "2026-09-16T11:14:06.064108+00:00",
-      "request_end_timestamp": "2026-09-16T11:14:06.293855+00:00",
-      "total_backend_elapsed_ms": 229.74,
+      "request_start_timestamp": "2026-09-16T12:36:33.294196+00:00",
+      "request_end_timestamp": "2026-09-16T12:36:33.817174+00:00",
+      "total_backend_elapsed_ms": 522.95,
       "number_of_gemini_provider_calls": 0,
       "tender_requirement_gemini_call_count": 0,
       "bidder_fact_gemini_call_count": 0,
       "requirements_extracted": 21,
       "facts_extracted": 30,
       "whether_every_call_was_fresh": false,
-      "stage3_start_timestamp": "2026-09-16T11:14:06.116485+00:00",
-      "stage3_end_timestamp": "2026-09-16T11:14:06.292888+00:00",
-      "stage3_elapsed_ms": 176.41,
-      "stage4_start_timestamp": "2026-09-16T11:14:06.292920+00:00",
-      "stage4_end_timestamp": "2026-09-16T11:14:06.293702+00:00",
-      "stage4_elapsed_ms": 0.78
+      "stage3_start_timestamp": "2026-09-16T12:36:33.407387+00:00",
+      "stage3_end_timestamp": "2026-09-16T12:36:33.814321+00:00",
+      "stage3_elapsed_ms": 406.94,
+      "stage4_start_timestamp": "2026-09-16T12:36:33.814384+00:00",
+      "stage4_end_timestamp": "2026-09-16T12:36:33.816765+00:00",
+      "stage4_elapsed_ms": 2.39
     }
   },
-  "compliance_score": 16.666666666666664,
+  "compliance_score": 40.0,
   "compliance_score_breakdown": {
     "total_requirements": 21,
     "total_applicable": 7,
-    "passed": 3,
+    "passed": 5,
     "failed": 0,
-    "missing": 4,
+    "missing": 2,
     "under_review": 0,
     "not_verified": 0,
     "not_applicable": 14,
-    "raw_score": 16.67,
-    "final_score": 16.67,
+    "raw_score": 40.0,
+    "final_score": 40.0,
     "is_capped": false,
     "cap_reason": null,
     "deductions": [
-      {
-        "requirement_id": "REQ-GEM/2026/B/7959150-002",
-        "description": "Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs.",
-        "status": "MISSING",
-        "severity": "CRITICAL",
-        "deduction_points": 15.0,
-        "reason": "Required evidence missing: No bidder evidence submitted for 'bidder_average_annual_turnover'."
-      },
-      {
-        "requirement_id": "REQ-GEM/2026/B/7959150-007",
-        "description": "Past Performance requirement is 80%.",
-        "status": "MISSING",
-        "severity": "CRITICAL",
-        "deduction_points": 15.0,
-        "reason": "Required evidence missing: No bidder evidence submitted for 'past_performance_percentage'."
-      },
       {
         "requirement_id": "REQ-GEM/2026/B/7959150-009",
         "description": "ePBG Percentage required is 3.00% of the contract value.",
@@ -884,25 +1033,11 @@
       }
     ]
   },
-  "risk_level": "HIGH",
+  "risk_level": "CRITICAL",
   "risk_assessment": {
-    "level": "HIGH",
-    "risk_score": 0.77,
+    "level": "CRITICAL",
+    "risk_score": 0.98,
     "risk_factors": [
-      {
-        "code": "MANDATORY_EVIDENCE_MISSING",
-        "severity": "HIGH",
-        "category": "MISSING_EVIDENCE",
-        "description": "Mandatory documentation missing for 'REQ-GEM/2026/B/7959150-002': No bidder evidence submitted for 'bidder_average_annual_turnover'.",
-        "trigger_source": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-002"
-      },
-      {
-        "code": "MANDATORY_EVIDENCE_MISSING",
-        "severity": "HIGH",
-        "category": "MISSING_EVIDENCE",
-        "description": "Mandatory documentation missing for 'REQ-GEM/2026/B/7959150-007': No bidder evidence submitted for 'past_performance_percentage'.",
-        "trigger_source": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-007"
-      },
       {
         "code": "MANDATORY_EVIDENCE_MISSING",
         "severity": "HIGH",
@@ -916,28 +1051,45 @@
         "category": "MISSING_EVIDENCE",
         "description": "Mandatory documentation missing for 'REQ-GEM/2026/B/7959150-010': No bidder evidence submitted for 'epbg_duration_months'.",
         "trigger_source": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-010"
+      },
+      {
+        "code": "IDENTITY_OR_CRITICAL_CONTRADICTION",
+        "severity": "CRITICAL",
+        "category": "CONTRADICTION",
+        "description": "High-severity contradiction on 'AVERAGE_ANNUAL_TURNOVER': Financial turnover differs across documents: '14500000.0' vs '4167000.0'. (Comparing raw fields: 'bidder_average_annual_turnover_declared' vs 'bidder_average_annual_turnover_audited', canonical: 'AVERAGE_ANNUAL_TURNOVER')",
+        "trigger_source": "INT-JARVIS_DEMO_FORENSIC_BIDDER-AVERAGE_ANNUAL_TURNOVER-001"
+      },
+      {
+        "code": "IDENTITY_OR_CRITICAL_CONTRADICTION",
+        "severity": "CRITICAL",
+        "category": "CONTRADICTION",
+        "description": "High-severity contradiction on 'PAST_PERFORMANCE_PERCENT': Past performance supply quantity differs across documents: '450' vs '120'. (Comparing raw fields: 'past_performance_quantity_claimed' vs 'past_performance_quantity_actual', canonical: 'PAST_PERFORMANCE_PERCENT')",
+        "trigger_source": "INT-JARVIS_DEMO_FORENSIC_BIDDER-PAST_PERFORMANCE_PERCENT-002"
       }
     ],
     "mitigating_factors": [
       "No adverse debarment records found on government registries.",
-      "Zero mandatory clause failures detected in primary submission.",
-      "Cross-document consistency validated across all submitted sections."
+      "Zero mandatory clause failures detected in primary submission."
     ],
-    "escalation_triggers": []
+    "escalation_triggers": [
+      "Cross-document identity contradiction on AVERAGE_ANNUAL_TURNOVER",
+      "Cross-document identity contradiction on PAST_PERFORMANCE_PERCENT"
+    ]
   },
   "recommendation": {
     "verdict": "REVIEW",
     "confidence": "HIGH",
     "headline": "PROCUREMENT OFFICER REVIEW REQUIRED: Shortfalls or Discrepancies Pending",
-    "detailed_summary": "The submission achieved a compliance score of 16.7/100 with HIGH risk. Several items require procurement officer clarification or shortfall remediation before award qualification can be considered.",
+    "detailed_summary": "The submission achieved a compliance score of 40.0/100 with CRITICAL risk. Several items require procurement officer clarification or shortfall remediation before award qualification can be considered.",
     "key_reasons": [
-      "4 mandatory document(s) are missing from submission."
+      "2 mandatory document(s) are missing from submission.",
+      "2 cross-document inconsistency/inconsistencies detected."
     ],
     "critical_issues": [
-      "Mandatory document missing: 'Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs.'",
-      "Mandatory document missing: 'Past Performance requirement is 80%.'",
       "Mandatory document missing: 'ePBG Percentage required is 3.00% of the contract value.'",
-      "Mandatory document missing: 'Duration of ePBG required is 36 Months.'"
+      "Mandatory document missing: 'Duration of ePBG required is 36 Months.'",
+      "Cross-document contradiction on 'AVERAGE_ANNUAL_TURNOVER': Financial turnover differs across documents: '14500000.0' vs '4167000.0'. (Comparing raw fields: 'bidder_average_annual_turnover_declared' vs 'bidder_average_annual_turnover_audited', canonical: 'AVERAGE_ANNUAL_TURNOVER')",
+      "Cross-document contradiction on 'PAST_PERFORMANCE_PERCENT': Past performance supply quantity differs across documents: '450' vs '120'. (Comparing raw fields: 'past_performance_quantity_claimed' vs 'past_performance_quantity_actual', canonical: 'PAST_PERFORMANCE_PERCENT')"
     ],
     "pending_requirements": [
       {
@@ -955,22 +1107,6 @@
         "requires_human_review": true,
         "deficiency_type": "AMBIGUOUS_EVIDENCE",
         "suggested_bidder_action": "Procurement officer review required to inspect submitted clause or certificate."
-      },
-      {
-        "requirement_id": "REQ-GEM/2026/B/7959150-002",
-        "description": "Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs.",
-        "category": "FINANCIAL_CAPACITY",
-        "mandatory": true,
-        "applicability": "APPLICABLE",
-        "evidence_expected": ">= 100 Lakh (s) INR",
-        "evidence_found": "MISSING",
-        "government_verification_expected": null,
-        "government_verification_result": null,
-        "compliance_result": "MISSING",
-        "reason": "No bidder evidence submitted for 'bidder_average_annual_turnover'.",
-        "requires_human_review": true,
-        "deficiency_type": "MISSING_DOCUMENT",
-        "suggested_bidder_action": "Submit official document/certificate proving 'Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs.'."
       },
       {
         "requirement_id": "REQ-GEM/2026/B/7959150-005",
@@ -1003,22 +1139,6 @@
         "requires_human_review": true,
         "deficiency_type": "AMBIGUOUS_EVIDENCE",
         "suggested_bidder_action": "Procurement officer review required to inspect submitted clause or certificate."
-      },
-      {
-        "requirement_id": "REQ-GEM/2026/B/7959150-007",
-        "description": "Past Performance requirement is 80%.",
-        "category": "EXPERIENCE_PAST_PERFORMANCE",
-        "mandatory": true,
-        "applicability": "APPLICABLE",
-        "evidence_expected": ">= 80 % %",
-        "evidence_found": "MISSING",
-        "government_verification_expected": null,
-        "government_verification_result": null,
-        "compliance_result": "MISSING",
-        "reason": "No bidder evidence submitted for 'past_performance_percentage'.",
-        "requires_human_review": true,
-        "deficiency_type": "MISSING_DOCUMENT",
-        "suggested_bidder_action": "Submit official document/certificate proving 'Past Performance requirement is 80%.'."
       },
       {
         "requirement_id": "REQ-GEM/2026/B/7959150-008",
@@ -1230,13 +1350,13 @@
       }
     ],
     "suggested_officer_actions": [
-      "Issue shortfall notice for missing Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs..",
-      "Issue shortfall notice for missing Past Performance requirement is 80%..",
       "Issue shortfall notice for missing ePBG Percentage required is 3.00% of the contract value..",
-      "Issue shortfall notice for missing Duration of ePBG required is 36 Months.."
+      "Issue shortfall notice for missing Duration of ePBG required is 36 Months..",
+      "Seek bidder clarification on contradictory values for AVERAGE_ANNUAL_TURNOVER.",
+      "Seek bidder clarification on contradictory values for PAST_PERFORMANCE_PERCENT."
     ],
-    "risk_level": "HIGH",
-    "compliance_score": 16.67,
+    "risk_level": "CRITICAL",
+    "compliance_score": 40.0,
     "authority_notice": "DECISION_SUPPORT_ONLY: Final qualification/disqualification authority remains exclusively with the Procurement Officer."
   },
   "pending_requirements": [
@@ -1255,22 +1375,6 @@
       "requires_human_review": true,
       "deficiency_type": "AMBIGUOUS_EVIDENCE",
       "suggested_bidder_action": "Procurement officer review required to inspect submitted clause or certificate."
-    },
-    {
-      "requirement_id": "REQ-GEM/2026/B/7959150-002",
-      "description": "Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs.",
-      "category": "FINANCIAL_CAPACITY",
-      "mandatory": true,
-      "applicability": "APPLICABLE",
-      "evidence_expected": ">= 100 Lakh (s) INR",
-      "evidence_found": "MISSING",
-      "government_verification_expected": null,
-      "government_verification_result": null,
-      "compliance_result": "MISSING",
-      "reason": "No bidder evidence submitted for 'bidder_average_annual_turnover'.",
-      "requires_human_review": true,
-      "deficiency_type": "MISSING_DOCUMENT",
-      "suggested_bidder_action": "Submit official document/certificate proving 'Minimum Average Annual Turnover of the bidder for the last 3 years must be at least 100 Lakhs.'."
     },
     {
       "requirement_id": "REQ-GEM/2026/B/7959150-005",
@@ -1303,22 +1407,6 @@
       "requires_human_review": true,
       "deficiency_type": "AMBIGUOUS_EVIDENCE",
       "suggested_bidder_action": "Procurement officer review required to inspect submitted clause or certificate."
-    },
-    {
-      "requirement_id": "REQ-GEM/2026/B/7959150-007",
-      "description": "Past Performance requirement is 80%.",
-      "category": "EXPERIENCE_PAST_PERFORMANCE",
-      "mandatory": true,
-      "applicability": "APPLICABLE",
-      "evidence_expected": ">= 80 % %",
-      "evidence_found": "MISSING",
-      "government_verification_expected": null,
-      "government_verification_result": null,
-      "compliance_result": "MISSING",
-      "reason": "No bidder evidence submitted for 'past_performance_percentage'.",
-      "requires_human_review": true,
-      "deficiency_type": "MISSING_DOCUMENT",
-      "suggested_bidder_action": "Submit official document/certificate proving 'Past Performance requirement is 80%.'."
     },
     {
       "requirement_id": "REQ-GEM/2026/B/7959150-008",

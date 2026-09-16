@@ -70,8 +70,7 @@ def classify_requirement_scope(
         return "PROCESS_CONDITION"
 
     # 1. Actionable bidder obligation markers (action verbs, submission nouns, compliance verbs)
-    actionable_markers = [
-        "bidder must", "bidder shall", "seller must", "seller shall",
+    explicit_submission_markers = [
         "to be submitted", "must be submitted", "shall be submitted",
         "to be uploaded", "must be uploaded", "shall be uploaded",
         "undertaking required", "certificate required", "declaration required",
@@ -84,13 +83,18 @@ def classify_requirement_scope(
         "undertaking certifying", "undertaking confirming", "certify compliance",
         "documentary evidence", "supporting document", "supporting documents"
     ]
-    has_actionable_marker = any(m in combined_norm for m in actionable_markers)
+    has_submission = any(m in combined_norm for m in explicit_submission_markers)
+
+    general_actionable_markers = [
+        "bidder must", "bidder shall", "seller must", "seller shall"
+    ]
+    has_actionable_marker = has_submission or any(m in combined_norm for m in general_actionable_markers)
 
     # 2. Informational Cross-reference pointer check (e.g. "As indicated in the bid document")
     if expected_value is not None:
         exp_str = str(expected_value).lower().strip()
         if any(p in exp_str for p in ["as indicated", "as per bid document", "refer to bid document", "refer to tender"]):
-            if not has_actionable_marker:
+            if not has_submission:
                 return "INFORMATIONAL"
 
     # 3. Administrative Metadata (buyer identifiers, tender codes, total quantity, delivery address)
@@ -101,7 +105,7 @@ def classify_requirement_scope(
         "consignee delivery details", "buyer uploaded atc", "required documents",
         "show documents to bidders"
     ]
-    if any(k in combined_norm for k in info_keywords) and not has_actionable_marker:
+    if any(k in combined_norm for k in info_keywords) and not has_submission:
         return "INFORMATIONAL"
 
     # 4. Portal Mechanics & Process Conditions (dates, evaluation methods, payment terms, buyer margins)
@@ -119,7 +123,7 @@ def classify_requirement_scope(
         "false declaration penalty", "bunch bid", "bunch bids", "mse purchase preference",
         "purchase preference"
     ]
-    if any(k in combined_norm for k in process_keywords) and not has_actionable_marker:
+    if any(k in combined_norm for k in process_keywords) and not has_submission:
         return "PROCESS_CONDITION"
 
     # 5. General Policy / Contractual Terms / Standard GTC Restrictions
@@ -140,20 +144,19 @@ def classify_requirement_scope(
         "less than 3 years", "date of constitution",
         "land border sharing registration"  # conditional statutory rule: only applies if from border country
     ]
-    if any(k in combined_norm for k in policy_keywords) and not has_actionable_marker:
+    if any(k in combined_norm for k in policy_keywords) and not has_submission:
         return "GENERAL_POLICY"
 
     # 6. Check for substantive bidder capability thresholds
     op_upper = str(operator or "").upper()
     bidder_capability_terms = [
         "turnover", "revenue", "experience", "past performance",
-        "warranty", "local content", "delivery period", "emd", "epbg",
-        "labour law"
+        "warranty", "local content", "delivery period", "emd", "epbg"
     ]
     is_bidder_capability = any(t in combined_norm for t in bidder_capability_terms)
 
     has_substantive_operator = False
-    if op_upper == "EXISTS":
+    if op_upper == "EXISTS" and not any(k in combined_norm for k in policy_keywords):
         has_substantive_operator = True
     elif op_upper in (">=", "<=", ">", "<", "==") and is_bidder_capability:
         exp_str = str(expected_value or "").lower()

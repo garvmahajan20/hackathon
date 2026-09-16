@@ -5919,8 +5919,8 @@
   "audit_metadata": {
     "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_PASS_BIDDER",
     "deterministic_run_id": "RUN-89139A10CFE6",
-    "generated_at": "2026-09-16T11:14:05Z",
-    "processing_time_ms": 382.44940000004135,
+    "generated_at": "2026-09-16T12:36:32Z",
+    "processing_time_ms": 793.8032999954885,
     "active_model": "gemini-3.8-flash",
     "extraction_mode": "CACHED"
   },

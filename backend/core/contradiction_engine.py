@@ -132,6 +132,22 @@ class CrossDocumentContradictionEngine:
                         f"Financial turnover differs across documents: '{value_a}' vs '{value_b}'."
                     )
 
+        # 3B. Past Performance / Quantity checks
+        if any(term in f_lower for term in ["past_performance", "performance", "quantity", "units"]):
+            num_a, _ = normalize_numeric(value_a)
+            num_b, _ = normalize_numeric(value_b)
+
+            if num_a is not None and num_b is not None:
+                if num_a == num_b:
+                    return "CONSISTENT", "CONSISTENT_PERFORMANCE", "INFO", f"Past performance quantity matches across documents: '{value_a}' == '{value_b}'."
+                else:
+                    return (
+                        "CONTRADICTION",
+                        "PAST_PERFORMANCE_CONTRADICTION",
+                        "HIGH",
+                        f"Past performance supply quantity differs across documents: '{value_a}' vs '{value_b}'."
+                    )
+
         # 4. Company Name checks
         if any(term in f_lower for term in ["company", "bidder", "legal_name", "entity_name"]):
             norm_a = _normalize_name_for_comparison(value_a)
