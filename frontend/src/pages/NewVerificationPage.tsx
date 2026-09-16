@@ -149,7 +149,7 @@ export const NewVerificationPage: React.FC = () => {
     if (tenderId.trim()) formData.append("tender_id", tenderId.trim());
     if (bidId.trim()) formData.append("bid_id", bidId.trim());
     if (companyName.trim()) formData.append("company_name", companyName.trim());
-    formData.append("mode", "live");
+    formData.append("mode", "cached");
 
     const onProgress = (evt: StageProgressEvent) => {
       const step = evt.step;
