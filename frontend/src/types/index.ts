@@ -55,6 +55,7 @@ export interface IntegrityFinding {
   finding_id: string;
   bid_id: string;
   field: string;
+  finding_type?: string;
   status: IntegrityStatus;
   severity: string; // HIGH, MEDIUM, LOW
   description: string;

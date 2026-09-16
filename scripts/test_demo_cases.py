@@ -38,6 +38,16 @@ def run_case(case_name, tender_pdf, bidder_pdf, expected_status):
         print(f"Major Failures: {result.major_failures}")
         print(f"Human Review Items: {len(result.human_review_items)}")
         print(f"Contradictions/Integrity: {len(result.contradictions)}")
+        for r in result.verification_results:
+            st = r.get("status") if isinstance(r, dict) else getattr(r, "status", "")
+            rid = r.get("requirement_id") if isinstance(r, dict) else getattr(r, "requirement_id", "")
+            rtype = r.get("requirement_type") if isinstance(r, dict) else getattr(r, "requirement_type", "")
+            reason = r.get("reason") if isinstance(r, dict) else getattr(r, "reason", "")
+            if st in ("FAIL", "MISSING"):
+                print(f"  [{st}] {rid} ({rtype}): {reason}")
+        for c in result.contradictions:
+            desc = c.get("description") if isinstance(c, dict) else getattr(c, "description", "")
+            print(f"  [CONTRADICTION] {desc}")
         
         out_path = f"data/demo/result_{case_name.lower()}.json"
         with open(out_path, "w", encoding="utf-8") as f:

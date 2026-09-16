@@ -141,6 +141,7 @@ def classify_requirement_scope(
         "external reference prohibition", "tender fee prohibition", "additional item addition",
         "bids less than 200 crore", "auditor certification threshold", "mii eligibility",
         "local supplier restriction", "class 2 local content threshold",
+        "allow participation only", "allow participation", "participation only from",
         "less than 3 years", "date of constitution",
         "land border sharing registration"  # conditional statutory rule: only applies if from border country
     ]

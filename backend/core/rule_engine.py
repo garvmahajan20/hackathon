@@ -67,7 +67,7 @@ class DeterministicRuleEngine:
         facts_by_field: Dict[str, List[BidderFact]] = defaultdict(list)
         facts_by_canonical: Dict[str, List[BidderFact]] = defaultdict(list)
         bid_id = "UNKNOWN_BID"
-        for f in facts:
+        for f in sorted(facts, key=lambda x: getattr(x, "page", 1) or 1):
             if f.bid_id:
                 bid_id = f.bid_id
             facts_by_field[f.field.lower()].append(f)

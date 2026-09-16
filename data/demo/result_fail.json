@@ -768,7 +768,7 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FAIL_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FAIL_BIDDER-REQ-GEM/2026/B/7959150-009",
-      "created_at": "2026-09-16T12:36:33Z",
+      "created_at": "2026-09-16T14:40:56Z",
       "status": "OPEN"
     },
     {
@@ -783,11 +783,11 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FAIL_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FAIL_BIDDER-REQ-GEM/2026/B/7959150-010",
-      "created_at": "2026-09-16T12:36:33Z",
+      "created_at": "2026-09-16T14:40:56Z",
       "status": "OPEN"
     }
   ],
-  "generated_at": "2026-09-16T12:36:33Z",
+  "generated_at": "2026-09-16T14:40:56Z",
   "deterministic_run_id": "RUN-84F0B5BC7BC5",
   "processing_metadata": {
     "debarred": false,
@@ -800,11 +800,11 @@
     "active_model": "gemini-3.8-flash",
     "extraction_source": "CACHED",
     "cache_policy": "USE_CACHE",
-    "latency_ms": 459.13719999953173,
+    "latency_ms": 247.54170000960585,
     "requirement_source": "CACHED",
     "fact_source": "CACHED",
     "diagnostic_telemetry": {
-      "run_id": "RUN-41B8114C",
+      "run_id": "RUN-EDDE3442",
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FAIL_BIDDER",
       "mode": "CACHED",
       "provider": "Gemini",
@@ -818,21 +818,21 @@
       "llm_calls": 0,
       "llm_latencies": [],
       "extraction_source": "CACHED",
-      "request_start_timestamp": "2026-09-16T12:36:32.779628+00:00",
-      "request_end_timestamp": "2026-09-16T12:36:33.238795+00:00",
-      "total_backend_elapsed_ms": 459.14,
+      "request_start_timestamp": "2026-09-16T14:40:56.575399+00:00",
+      "request_end_timestamp": "2026-09-16T14:40:56.822955+00:00",
+      "total_backend_elapsed_ms": 247.54,
       "number_of_gemini_provider_calls": 0,
       "tender_requirement_gemini_call_count": 0,
       "bidder_fact_gemini_call_count": 0,
       "requirements_extracted": 21,
       "facts_extracted": 19,
       "whether_every_call_was_fresh": false,
-      "stage3_start_timestamp": "2026-09-16T12:36:32.902230+00:00",
-      "stage3_end_timestamp": "2026-09-16T12:36:33.236667+00:00",
-      "stage3_elapsed_ms": 334.44,
-      "stage4_start_timestamp": "2026-09-16T12:36:33.236719+00:00",
-      "stage4_end_timestamp": "2026-09-16T12:36:33.238532+00:00",
-      "stage4_elapsed_ms": 1.82
+      "stage3_start_timestamp": "2026-09-16T14:40:56.627629+00:00",
+      "stage3_end_timestamp": "2026-09-16T14:40:56.821726+00:00",
+      "stage3_elapsed_ms": 194.09,
+      "stage4_start_timestamp": "2026-09-16T14:40:56.821777+00:00",
+      "stage4_end_timestamp": "2026-09-16T14:40:56.822799+00:00",
+      "stage4_elapsed_ms": 1.03
     }
   },
   "compliance_score": 4.25531914893617,

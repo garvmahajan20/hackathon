@@ -18,6 +18,7 @@ CRITICAL EXTRACTION GUIDELINES:
    - EXTRACT ONLY facts explicitly stated in the attached PDF document.
    - Every fact MUST reference the EXACT source page where the claim appears in the document.
    - Preserve the exact raw text snippet and raw value from the source.
+   - Cross-Document & Multi-Page Discrepancies: When multiple pages or annexures state differing or conflicting figures (e.g. self-declared turnover on Page 1 vs audited turnover on Page 2, claimed contract quantity on Page 3 vs certified delivered quantity on Page 4), you MUST extract BOTH values as independent facts with their exact page numbers and evidence snippets. Never omit a claimed figure in favor of an audited figure or vice-versa.
 
 3. BILINGUAL / MULTILINGUAL & CORRUPTED TEXT HANDLING:
    - Always prefer the clean English text in bilingual clauses.

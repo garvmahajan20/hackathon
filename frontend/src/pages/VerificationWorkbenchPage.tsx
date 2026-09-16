@@ -755,8 +755,8 @@ export const VerificationWorkbenchPage: React.FC = () => {
                   </div>
 
                   <div>
-                    <h4 className="text-base font-bold text-slate-900">
-                      GSTIN discrepancy detected
+                    <h4 className="text-base font-bold text-slate-900 capitalize">
+                      {c.finding_type ? c.finding_type.replace(/_/g, ' ').toLowerCase() : 'Discrepancy detected'}
                     </h4>
 
                     <p className="mt-1 text-xs text-slate-600">
@@ -770,8 +770,8 @@ export const VerificationWorkbenchPage: React.FC = () => {
                     <div className="bg-white border border-rose-200 rounded-lg p-3">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            Technical Schedule
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate max-w-[160px]" title={c.evidence_a.document}>
+                            {c.evidence_a.document ? c.evidence_a.document.split('.')[0].replace(/_/g, ' ') : 'Evidence Source A'}
                           </p>
 
                           <p className="text-[10px] text-slate-400">
@@ -822,8 +822,8 @@ export const VerificationWorkbenchPage: React.FC = () => {
                     <div className="bg-white border border-rose-200 rounded-lg p-3">
                       <div className="flex items-center justify-between gap-2 mb-2">
                         <div>
-                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                            Financial Annexure
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500 truncate max-w-[160px]" title={c.evidence_b.document}>
+                            {c.evidence_b.document ? c.evidence_b.document.split('.')[0].replace(/_/g, ' ') : 'Evidence Source B'}
                           </p>
 
                           <p className="text-[10px] text-slate-400">

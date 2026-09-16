@@ -134,6 +134,66 @@ def evaluate_lt(actual: Any, expected: Any, field_name: str = "") -> OperatorRes
             return OperatorResult(ComplianceStatus.FAIL, f"Actual value ({actual}) is not strictly less than ({expected}).")
     return OperatorResult(ComplianceStatus.REVIEW, f"Incompatible types for '<' comparison: actual='{actual}', expected='{expected}'.", requires_human_review=True)
 
+def _evaluate_local_content_class(actual: Any, expected: Any) -> Optional[OperatorResult]:
+    """
+    Evaluates Make-in-India (MII) Local Content supplier class qualification.
+    Handles tender requirements specifying Class 1 / Class 2 supplier tiers
+    either with explicit percentage thresholds (e.g. 'Class 1: >= 50%, Class 2: >= 20%')
+    or generic class requirements (e.g. 'Class 1/Class 2 local suppliers', 'Class 1, Class 2').
+    """
+    if actual is None or expected is None:
+        return None
+
+    exp_lower = str(expected).lower()
+    if not ("class" in exp_lower or "local supplier" in exp_lower or "local content" in exp_lower):
+        return None
+
+    # Parse thresholds from expected if specified, default: Class 1 = 50%, Class 2 = 20%
+    class_1_req = ("class 1" in exp_lower or "class i" in exp_lower or "class-1" in exp_lower or "class-i" in exp_lower)
+    class_2_req = ("class 2" in exp_lower or "class ii" in exp_lower or "class-2" in exp_lower or "class-ii" in exp_lower)
+
+    c1_thresh = Decimal("50.0")
+    c2_thresh = Decimal("20.0")
+
+    c1_match = re.search(r"class\s*(?:1|i|-[1i])[^0-9]*?(\d+(?:\.\d+)?)\s*%", exp_lower)
+    if c1_match:
+        c1_thresh = Decimal(c1_match.group(1))
+    c2_match = re.search(r"class\s*(?:2|ii|-[2ii])[^0-9]*?(\d+(?:\.\d+)?)\s*%", exp_lower)
+    if c2_match:
+        c2_thresh = Decimal(c2_match.group(1))
+
+    # Check if actual is numeric / percentage
+    act_num, _ = normalize_numeric(actual)
+    if act_num is not None:
+        if class_1_req and act_num >= c1_thresh:
+            return OperatorResult(
+                ComplianceStatus.PASS,
+                f"Actual local content ({act_num}%) qualifies as Class 1 Local Supplier (threshold >= {c1_thresh}%) specified in '{expected}'."
+            )
+        elif class_2_req and act_num >= c2_thresh:
+            return OperatorResult(
+                ComplianceStatus.PASS,
+                f"Actual local content ({act_num}%) qualifies as Class 2 Local Supplier (threshold >= {c2_thresh}%) specified in '{expected}'."
+            )
+        else:
+            min_required = min(c1_thresh if class_1_req else Decimal("100"), c2_thresh if class_2_req else Decimal("100"))
+            return OperatorResult(
+                ComplianceStatus.FAIL,
+                f"Actual local content ({act_num}%) is below minimum qualifying threshold ({min_required}%) for '{expected}'."
+            )
+
+    # Check if actual is a categorical string (e.g. 'Class 1', 'Class-I', 'Class 2')
+    act_lower = str(actual).lower()
+    is_act_c1 = ("class 1" in act_lower or "class i" in act_lower or "class-1" in act_lower or "class-i" in act_lower)
+    is_act_c2 = ("class 2" in act_lower or "class ii" in act_lower or "class-2" in act_lower or "class-ii" in act_lower)
+
+    if class_1_req and is_act_c1:
+        return OperatorResult(ComplianceStatus.PASS, f"Actual classification '{actual}' matches approved Class 1 in '{expected}'.")
+    if class_2_req and is_act_c2:
+        return OperatorResult(ComplianceStatus.PASS, f"Actual classification '{actual}' matches approved Class 2 in '{expected}'.")
+
+    return None
+
 def evaluate_eq(actual: Any, expected: Any, field_name: str = "") -> OperatorResult:
     # 1. Boolean check
     act_b = normalize_boolean(actual)
@@ -151,6 +211,11 @@ def evaluate_eq(actual: Any, expected: Any, field_name: str = "") -> OperatorRes
             return OperatorResult(ComplianceStatus.PASS, f"Required undertaking/submission provided: '{actual}'.")
         else:
             return OperatorResult(ComplianceStatus.FAIL, f"Required undertaking/submission not provided: '{actual}'.")
+
+    # 1C. MII Local Content Class evaluation
+    mii_res = _evaluate_local_content_class(actual, expected)
+    if mii_res is not None:
+        return mii_res
 
     # 2. Try Duration check
     dur_pair = _try_duration_comparison(actual, expected)
@@ -198,16 +263,10 @@ def evaluate_in(actual: Any, expected: Any, field_name: str = "") -> OperatorRes
     if actual is None:
         return OperatorResult(ComplianceStatus.FAIL, "Actual value is missing for 'IN' check.")
 
-    exp_str_lower = str(expected).lower()
-    if "class" in exp_str_lower and "%" not in exp_str_lower:
-        num_act, _ = normalize_numeric(actual)
-        if num_act is not None:
-            inferred_class = "class 1" if num_act >= 50 else ("class 2" if num_act >= 20 else "non-local")
-            candidates_raw = [x.strip().lower() for x in exp_str_lower.split(",")]
-            class_map = {"class i": "class 1", "class-i": "class 1", "class ii": "class 2", "class-ii": "class 2"}
-            candidates_clean = [class_map.get(c, c) for c in candidates_raw]
-            if inferred_class in candidates_clean:
-                return OperatorResult(ComplianceStatus.PASS, f"Actual percentage ({num_act}%) qualifies as '{inferred_class}' which is in approved list ({expected}).")
+    # 1. MII Local Content Class evaluation
+    mii_res = _evaluate_local_content_class(actual, expected)
+    if mii_res is not None:
+        return mii_res
 
     act_cat = normalize_categorical(actual)
 

@@ -845,7 +845,7 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-009",
-      "created_at": "2026-09-16T12:36:33Z",
+      "created_at": "2026-09-16T14:40:57Z",
       "status": "OPEN"
     },
     {
@@ -860,7 +860,7 @@
       "source_pages": [],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "related_verification_id": "VERIF-JARVIS_DEMO_FORENSIC_BIDDER-REQ-GEM/2026/B/7959150-010",
-      "created_at": "2026-09-16T12:36:33Z",
+      "created_at": "2026-09-16T14:40:57Z",
       "status": "OPEN"
     },
     {
@@ -904,7 +904,7 @@
       ],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "related_verification_id": "INT-JARVIS_DEMO_FORENSIC_BIDDER-AVERAGE_ANNUAL_TURNOVER-001",
-      "created_at": "2026-09-16T12:36:33Z",
+      "created_at": "2026-09-16T14:40:57Z",
       "status": "OPEN"
     },
     {
@@ -948,11 +948,11 @@
       ],
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "related_verification_id": "INT-JARVIS_DEMO_FORENSIC_BIDDER-PAST_PERFORMANCE_PERCENT-002",
-      "created_at": "2026-09-16T12:36:33Z",
+      "created_at": "2026-09-16T14:40:57Z",
       "status": "OPEN"
     }
   ],
-  "generated_at": "2026-09-16T12:36:33Z",
+  "generated_at": "2026-09-16T14:40:57Z",
   "deterministic_run_id": "RUN-3ED64FCC6632",
   "processing_metadata": {
     "debarred": false,
@@ -965,11 +965,11 @@
     "active_model": "gemini-3.8-flash",
     "extraction_source": "CACHED",
     "cache_policy": "USE_CACHE",
-    "latency_ms": 522.9535999969812,
+    "latency_ms": 248.18519999098498,
     "requirement_source": "CACHED",
     "fact_source": "CACHED",
     "diagnostic_telemetry": {
-      "run_id": "RUN-CC9B1F59",
+      "run_id": "RUN-CA599C8A",
       "verification_id": "VERIF-GEM_2026_B_7959150-JARVIS_DEMO_FORENSIC_BIDDER",
       "mode": "CACHED",
       "provider": "Gemini",
@@ -983,21 +983,21 @@
       "llm_calls": 0,
       "llm_latencies": [],
       "extraction_source": "CACHED",
-      "request_start_timestamp": "2026-09-16T12:36:33.294196+00:00",
-      "request_end_timestamp": "2026-09-16T12:36:33.817174+00:00",
-      "total_backend_elapsed_ms": 522.95,
+      "request_start_timestamp": "2026-09-16T14:40:56.852339+00:00",
+      "request_end_timestamp": "2026-09-16T14:40:57.100542+00:00",
+      "total_backend_elapsed_ms": 248.19,
       "number_of_gemini_provider_calls": 0,
       "tender_requirement_gemini_call_count": 0,
       "bidder_fact_gemini_call_count": 0,
       "requirements_extracted": 21,
       "facts_extracted": 30,
       "whether_every_call_was_fresh": false,
-      "stage3_start_timestamp": "2026-09-16T12:36:33.407387+00:00",
-      "stage3_end_timestamp": "2026-09-16T12:36:33.814321+00:00",
-      "stage3_elapsed_ms": 406.94,
-      "stage4_start_timestamp": "2026-09-16T12:36:33.814384+00:00",
-      "stage4_end_timestamp": "2026-09-16T12:36:33.816765+00:00",
-      "stage4_elapsed_ms": 2.39
+      "stage3_start_timestamp": "2026-09-16T14:40:56.902902+00:00",
+      "stage3_end_timestamp": "2026-09-16T14:40:57.099214+00:00",
+      "stage3_elapsed_ms": 196.32,
+      "stage4_start_timestamp": "2026-09-16T14:40:57.099247+00:00",
+      "stage4_end_timestamp": "2026-09-16T14:40:57.100329+00:00",
+      "stage4_elapsed_ms": 1.08
     }
   },
   "compliance_score": 40.0,

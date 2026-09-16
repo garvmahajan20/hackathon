@@ -737,7 +737,7 @@ export const NewVerificationPage: React.FC = () => {
                         </p>
                         <p className="mt-1 text-sm font-black text-slate-900">
                           {typeof completedResult.compliance_score === "number"
-                            ? `${Math.round(completedResult.compliance_score)}%`
+                            ? `${Math.round(completedResult.compliance_score * 100) / 100}%`
                             : "N/A"}
                         </p>
                       </div>
