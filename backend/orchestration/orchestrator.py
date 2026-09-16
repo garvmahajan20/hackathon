@@ -155,7 +155,17 @@ class VerificationOrchestrator:
             t_base = os.path.basename(tender_document_path)
             b_base = os.path.basename(bid_document_paths[0]) if bid_document_paths else "BID-UNKNOWN"
             tender_id = tender_id or (t_base.split(".")[0] if "TENDER" in t_base else "TENDER-0001")
-            bid_id = bid_id or (b_base.split(".")[0] if "BID" in b_base else "BID-00001")
+            
+            # Map canonical demo bidders so prompt cache keys match regardless of file rename or temp prefix
+            if not bid_id or "JARVIS_DEMO_" in str(bid_id):
+                if "JARVIS_DEMO_PASS_BIDDER" in b_base or (bid_id and "JARVIS_DEMO_PASS_BIDDER" in str(bid_id)):
+                    bid_id = "JARVIS_DEMO_PASS_BIDDER"
+                elif "JARVIS_DEMO_FAIL_BIDDER" in b_base or (bid_id and "JARVIS_DEMO_FAIL_BIDDER" in str(bid_id)):
+                    bid_id = "JARVIS_DEMO_FAIL_BIDDER"
+                elif "JARVIS_DEMO_FORENSIC_BIDDER" in b_base or (bid_id and "JARVIS_DEMO_FORENSIC_BIDDER" in str(bid_id)):
+                    bid_id = "JARVIS_DEMO_FORENSIC_BIDDER"
+                elif not bid_id:
+                    bid_id = b_base.split(".")[0] if "BID" in b_base else "BID-00001"
 
             # --- STEP 1: PDF Ingestion & Page Segmentation ---
             current_step = 1

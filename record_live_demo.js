@@ -51,11 +51,14 @@ async (page) => {
     console.log('Uploading tender and PASS bidder PDFs...');
     const tenderInput1 = recPage.locator('label:has-text("Browse PDF") input[type="file"]');
     await tenderInput1.setInputFiles('D:\\smart_india_hackathon\\project\\video_pdf.pdf');
-    await recPage.waitForTimeout(1500);
+    await recPage.waitForSelector('text=PDF accepted', { timeout: 10000 });
+    await recPage.waitForTimeout(1000);
 
     const bidInput1 = recPage.locator('label:has-text("Browse files") input[type="file"]');
     await bidInput1.setInputFiles('D:\\smart_india_hackathon\\project\\JARVIS_DEMO_PASS_BIDDER_GEM_2026_B_7959150.pdf');
-    await recPage.waitForTimeout(2000);
+    await recPage.waitForSelector('span:has-text("1 file")', { timeout: 10000 });
+    await recPage.waitForSelector('text=JARVIS_DEMO_PASS_BIDDER_GEM_2026_B_7959150.pdf', { timeout: 10000 });
+    await recPage.waitForTimeout(1500);
 
     // Trigger verification pipeline
     console.log('Triggering pipeline for PASS case...');
@@ -80,7 +83,7 @@ async (page) => {
     await recPage.getByText('Loading verification dossier...').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     await recPage.waitForTimeout(3500);
 
-    // Inspect Bidder Turnover Grounding
+    // Inspect Bidder Turnover Grounding (Page 2)
     const pTurnover = recPage.locator('tr:has-text("REQ-TENDER-0001-004")').first();
     if (await pTurnover.count() > 0) {
       await pTurnover.click();
@@ -89,7 +92,7 @@ async (page) => {
     }
     await recPage.waitForTimeout(3500);
 
-    // Inspect OEM Turnover Grounding
+    // Inspect OEM Turnover Grounding (Page 2)
     const pOem = recPage.locator('tr:has-text("REQ-TENDER-0001-005")').first();
     if (await pOem.count() > 0) {
       await pOem.click();
@@ -115,11 +118,14 @@ async (page) => {
     console.log('Uploading tender and FAIL bidder PDFs...');
     const tenderInput2 = recPage.locator('label:has-text("Browse PDF") input[type="file"]');
     await tenderInput2.setInputFiles('D:\\smart_india_hackathon\\project\\video_pdf.pdf');
-    await recPage.waitForTimeout(1500);
+    await recPage.waitForSelector('text=PDF accepted', { timeout: 10000 });
+    await recPage.waitForTimeout(1000);
 
     const bidInput2 = recPage.locator('label:has-text("Browse files") input[type="file"]');
     await bidInput2.setInputFiles('D:\\smart_india_hackathon\\project\\JARVIS_DEMO_FAIL_BIDDER_GEM_2026_B_7959150.pdf');
-    await recPage.waitForTimeout(2000);
+    await recPage.waitForSelector('span:has-text("1 file")', { timeout: 10000 });
+    await recPage.waitForSelector('text=JARVIS_DEMO_FAIL_BIDDER_GEM_2026_B_7959150.pdf', { timeout: 10000 });
+    await recPage.waitForTimeout(1500);
 
     // Trigger verification pipeline
     console.log('Triggering pipeline for FAIL case...');
@@ -144,24 +150,24 @@ async (page) => {
     await recPage.getByText('Loading verification dossier...').waitFor({ state: 'hidden', timeout: 15000 }).catch(() => {});
     await recPage.waitForTimeout(3500);
 
-    // Inspect Turnover shortfall
+    // Inspect Turnover shortfall (41.67L < 100L)
     const fTurnover = recPage.locator('tr:has-text("REQ-TENDER-0001-004")').first();
     if (await fTurnover.count() > 0) {
       await fTurnover.click();
       await recPage.waitForTimeout(3000);
     }
 
-    // Inspect OEM Turnover shortfall
-    const fOem = recPage.locator('tr:has-text("REQ-TENDER-0001-005")').first();
-    if (await fOem.count() > 0) {
-      await fOem.click();
-      await recPage.waitForTimeout(3000);
-    }
-
-    // Inspect Experience shortfall
+    // Inspect Experience shortfall (1.5Y < 3Y)
     const fExp = recPage.locator('tr:has-text("REQ-TENDER-0001-006")').first();
     if (await fExp.count() > 0) {
       await fExp.click();
+      await recPage.waitForTimeout(3000);
+    }
+
+    // Inspect Past Performance shortfall (120 units < 400 units)
+    const fPerf = recPage.locator('tr:has-text("REQ-TENDER-0001-007")').first();
+    if (await fPerf.count() > 0) {
+      await fPerf.click();
       await recPage.waitForTimeout(3000);
     }
 
@@ -182,11 +188,14 @@ async (page) => {
     console.log('Uploading tender and FORENSIC bidder PDFs...');
     const tenderInput3 = recPage.locator('label:has-text("Browse PDF") input[type="file"]');
     await tenderInput3.setInputFiles('D:\\smart_india_hackathon\\project\\video_pdf.pdf');
-    await recPage.waitForTimeout(1500);
+    await recPage.waitForSelector('text=PDF accepted', { timeout: 10000 });
+    await recPage.waitForTimeout(1000);
 
     const bidInput3 = recPage.locator('label:has-text("Browse files") input[type="file"]');
     await bidInput3.setInputFiles('D:\\smart_india_hackathon\\project\\JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf');
-    await recPage.waitForTimeout(2000);
+    await recPage.waitForSelector('span:has-text("1 file")', { timeout: 10000 });
+    await recPage.waitForSelector('text=JARVIS_DEMO_FORENSIC_BIDDER_GEM_2026_B_7959150.pdf', { timeout: 10000 });
+    await recPage.waitForTimeout(1500);
 
     // Trigger verification pipeline
     console.log('Triggering pipeline for FORENSIC case...');
