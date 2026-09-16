@@ -896,7 +896,7 @@ export const VerificationWorkbenchPage: React.FC = () => {
                     </h4>
 
                     <p className="mt-1 text-xs text-slate-600 max-w-2xl">
-                      GSTIN inconsistency requires officer verification before
+                      Cross-document inconsistency requires officer verification before
                       the bid can proceed.
                     </p>
                   </div>
