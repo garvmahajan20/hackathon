@@ -79,7 +79,7 @@ class VerificationOrchestrator:
         # Provider initialization
         if provider:
             self.provider = provider
-        elif self.mode == LLMMode.LIVE:
+        elif self.mode in (LLMMode.LIVE, LLMMode.CACHED):
             self.provider = GeminiProvider()
         else:
             self.provider = MockLLMProvider()
@@ -666,7 +666,24 @@ class VerificationOrchestrator:
                     "verification": aggregated.to_dict(),
                     "dossier": dossier.to_dict()
                 }, f, indent=2)
-            os.replace(temp_file, verif_file)
+            try:
+                os.replace(temp_file, verif_file)
+            except OSError:
+                import time
+                time.sleep(0.05)
+                try:
+                    os.replace(temp_file, verif_file)
+                except OSError:
+                    with open(verif_file, 'w', encoding='utf-8') as f_direct:
+                        json.dump({
+                            'verification': aggregated.to_dict(),
+                            'dossier': dossier.to_dict()
+                        }, f_direct, indent=2)
+                    if os.path.exists(temp_file):
+                        try:
+                            os.remove(temp_file)
+                        except OSError:
+                            pass
         except Exception as e:
             if os.path.exists(temp_file):
                 try:

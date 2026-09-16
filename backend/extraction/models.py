@@ -65,7 +65,11 @@ class CandidateRequirement:
     operator: str = "=="
     expected_value: Any = None
     mandatory: bool = True
+
     evidence_block_ids: List[str] = dc.field(default_factory=list)
+    source_page: int = 1
+    evidence_snippet: str = ""
+
     source_clause: Optional[str] = None
     applicability: Optional[Dict[str, Any]] = None
     extraction_confidence: str = "HIGH"
@@ -80,7 +84,11 @@ class CandidateFact:
     """
     field: str
     raw_value: Any
+
     evidence_block_ids: List[str] = dc.field(default_factory=list)
+    source_page: int = 1
+    evidence_snippet: str = ""
+
     extraction_confidence: str = "HIGH"
     metadata: Optional[Dict[str, Any]] = None
 

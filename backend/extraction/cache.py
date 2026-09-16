@@ -40,7 +40,8 @@ class LLMCache:
         model_name: str,
         prompt_version: str,
         prompt_content: str,
-        schema_version: str = "v1"
+        schema_version: str = "v1",
+        pdf_sha256: str = ""
     ) -> str:
         """
         Creates a deterministic SHA-256 cache key based on invocation parameters and text content.
@@ -50,11 +51,14 @@ class LLMCache:
         hasher.update(b":")
         hasher.update(model_name.encode("utf-8"))
         hasher.update(b":")
-        hasher.update(prompt_version.encode("utf-8"))
+        hasher.update(str(prompt_version).encode("utf-8"))
         hasher.update(b":")
-        hasher.update(schema_version.encode("utf-8"))
+        hasher.update(str(schema_version).encode("utf-8"))
         hasher.update(b":")
         hasher.update(prompt_content.encode("utf-8"))
+        if pdf_sha256:
+            hasher.update(b":")
+            hasher.update(pdf_sha256.encode("utf-8"))
         return hasher.hexdigest()
 
     def get(self, key: str) -> Optional[LLMProviderResponse]:

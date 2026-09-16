@@ -30,6 +30,11 @@ def _try_numeric_comparison(actual: Any, expected: Any) -> Optional[Tuple[Decima
     exp_num, _ = normalize_numeric(expected)
     if act_num is not None and exp_num is not None:
         return act_num, exp_num
+    if isinstance(expected, str) and "%" in expected:
+        pcts = [Decimal(m) for m in re.findall(r"(\d+(?:\.\d+)?)\s*%", expected)]
+        if pcts and act_num is not None:
+            target = max(pcts) if act_num >= max(pcts) else min(pcts)
+            return act_num, target
     return None
 
 def _try_date_comparison(actual: Any, expected: Any) -> Optional[Tuple[date, date]]:

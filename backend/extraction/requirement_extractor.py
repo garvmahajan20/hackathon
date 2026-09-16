@@ -96,12 +96,20 @@ class TenderRequirementExtractor:
             if cat not in ALLOWED_CATEGORIES:
                 cat = "OTHER"
 
-            # Ground evidence
-            ground_res = grounder.ground_requirement(
-                candidate_block_ids=cand.evidence_block_ids,
-                expected_value=cand.expected_value,
-                description=cand.description,
-            )
+            # Ground evidence: native PDF semantic pointer grounding preferred, with legacy block ID fallback
+            if cand.evidence_snippet:
+                ground_res = grounder.ground_by_semantic_pointer(
+                    source_page=cand.source_page,
+                    evidence_snippet=cand.evidence_snippet,
+                )
+            elif cand.evidence_block_ids:
+                ground_res = grounder.ground_requirement(
+                    candidate_block_ids=cand.evidence_block_ids,
+                    expected_value=cand.expected_value,
+                    description=cand.description,
+                )
+            else:
+                continue
 
             if not ground_res.is_valid:
                 # Evidence grounding failed: reject extraction
@@ -150,6 +158,16 @@ class TenderRequirementExtractor:
                 validated_requirements.append(req_obj)
 
         return validated_requirements
+
+
+    def _read_pdf_bytes(self, filepath: str) -> bytes:
+        import os
+        if not filepath or not os.path.exists(filepath):
+            if self.mode == LLMMode.MOCK or getattr(self.provider, "is_mock", False):
+                return b"%PDF-1.4-MOCK"
+            raise FileNotFoundError(f"PDF not found at {filepath}")
+        with open(filepath, "rb") as f:
+            return f.read()
 
     def _extract_single_pass(
         self,
@@ -210,45 +228,48 @@ class TenderRequirementExtractor:
         p1_cached_any = False
 
         # PASS 1: Page-aware exhaustive procurement condition discovery
-        for page in extraction_result.pages:
-            p1_prompt = format_page_condition_prompt(effective_tender_id, page)
-            p1_cache_key = self.cache.generate_cache_key(
-                provider_name=self.provider.provider_name,
-                model_name=self.provider.model_name,
-                prompt_version=f"{REQUIREMENT_PROMPT_VERSION}-pass1-p{page.page_number}",
-                prompt_content=p1_prompt,
+        p1_prompt = format_tender_requirement_prompt(effective_tender_id, extraction_result.pages)
+        p1_cache_key = self.cache.generate_cache_key(
+            provider_name=self.provider.provider_name,
+            model_name=self.provider.model_name,
+            prompt_version=f"{REQUIREMENT_PROMPT_VERSION}-pass1",
+            prompt_content=p1_prompt,
+            pdf_sha256=extraction_result.metadata.sha256,
+        )
+        p1_text = ""
+        if self.cache.should_read_cache(self.mode) and self.cache.has(p1_cache_key):
+            cached_resp = self.cache.get(p1_cache_key)
+            if cached_resp and cached_resp.content:
+                p1_text = cached_resp.content
+                p1_cached_any = True
+
+        if not p1_text:
+            pdf_bytes = self._read_pdf_bytes(extraction_result.metadata.file_path)
+            resp = self.provider.generate_structured_from_pdf(
+                pdf_bytes=pdf_bytes,
+                prompt=p1_prompt,
+                system_prompt=TENDER_EXHAUSTIVE_CONDITION_SYSTEM_PROMPT,
             )
-            p1_text = ""
-            if self.cache.should_read_cache(self.mode) and self.cache.has(p1_cache_key):
-                cached_resp = self.cache.get(p1_cache_key)
-                if cached_resp and cached_resp.content:
-                    p1_text = cached_resp.content
-                    p1_cached_any = True
-
-            if not p1_text:
-                resp = self.provider.generate_structured(
-                    prompt=p1_prompt,
-                    system_prompt=TENDER_EXHAUSTIVE_CONDITION_SYSTEM_PROMPT,
-                )
-                if resp.error:
-                    if self.mode == LLMMode.LIVE:
-                        raise LLMProviderError(
-                            f"Tender requirement extraction failed on page {page.page_number} via {self.provider.provider_name} ({self.provider.model_name}): {resp.error}",
-                            provider_name=self.provider.provider_name,
-                            model_name=self.provider.model_name,
-                            error_detail=resp.error,
-                        )
-                    print(f"Extraction warning on page {page.page_number}: {resp.error}")
-                if not resp.error and resp.content:
-                    p1_text = resp.content
-                    if self.mode == LLMMode.LIVE and not resp.is_mock:
-                        self.cache.set(p1_cache_key, resp)
+            if resp.error:
+                if self.mode == LLMMode.LIVE:
+                    raise LLMProviderError(
+                        f"Tender requirement extraction failed via {self.provider.provider_name} ({self.provider.model_name}): {resp.error}",
+                        provider_name=self.provider.provider_name,
+                        model_name=self.provider.model_name,
+                        error_detail=resp.error,
+                    )
+                print(f"Extraction warning: {resp.error}")
+            if not resp.error and resp.content:
+                p1_text = resp.content
                 if self.mode == LLMMode.LIVE and not getattr(resp, "is_mock", False):
-                    time.sleep(1.0)
+                    self.cache.set(p1_cache_key, resp)
+            import time
+            if self.mode == LLMMode.LIVE and not getattr(resp, "is_mock", False):
+                time.sleep(1.0)
 
-            if p1_text:
-                page_candidates = self._parse_candidates(p1_text, default_source_pass="PASS_1_EXHAUSTIVE")
-                raw_candidates.extend(page_candidates)
+        if p1_text:
+            page_candidates = self._parse_candidates(p1_text, default_source_pass="PASS_1_EXHAUSTIVE")
+            raw_candidates.extend(page_candidates)
 
         # PASS 2: Targeted bidder-obligation discovery across all pages
         p2_prompt = format_tender_bidder_obligation_prompt(effective_tender_id, extraction_result.pages)
@@ -257,6 +278,7 @@ class TenderRequirementExtractor:
             model_name=self.provider.model_name,
             prompt_version=f"{REQUIREMENT_PROMPT_VERSION}-pass2",
             prompt_content=p2_prompt,
+            pdf_sha256=extraction_result.metadata.sha256,
         )
         p2_text = ""
         p2_cached = False
@@ -267,7 +289,9 @@ class TenderRequirementExtractor:
                 p2_cached = True
 
         if not p2_text:
-            resp_p2 = self.provider.generate_structured(
+            pdf_bytes = self._read_pdf_bytes(extraction_result.metadata.file_path)
+            resp_p2 = self.provider.generate_structured_from_pdf(
+                pdf_bytes=pdf_bytes,
                 prompt=p2_prompt,
                 system_prompt=TENDER_BIDDER_OBLIGATION_SYSTEM_PROMPT,
             )
@@ -282,7 +306,7 @@ class TenderRequirementExtractor:
                 print(f"Extraction warning on pass 2: {resp_p2.error}")
             if not resp_p2.error and resp_p2.content:
                 p2_text = resp_p2.content
-                if self.mode == LLMMode.LIVE and not resp_p2.is_mock:
+                if self.mode == LLMMode.LIVE and not getattr(resp_p2, "is_mock", False):
                     self.cache.set(p2_cache_key, resp_p2)
 
         if p2_text:
@@ -299,7 +323,6 @@ class TenderRequirementExtractor:
             self.last_extraction_source = "FRESH"
 
         return raw_candidates
-
     def _decompose_compound_candidates(self, candidates: List[CandidateRequirement]) -> List[CandidateRequirement]:
         decomposed: List[CandidateRequirement] = []
 
@@ -320,6 +343,8 @@ class TenderRequirementExtractor:
                     expected_value="Compliance of BoQ specification and supporting document",
                     mandatory=True,
                     evidence_block_ids=c.evidence_block_ids,
+                    source_page=c.source_page,
+                    evidence_snippet=c.evidence_snippet,
                     source_clause=c.source_clause,
                     applicability=c.applicability,
                     extraction_confidence=c.extraction_confidence,
@@ -334,6 +359,8 @@ class TenderRequirementExtractor:
                     expected_value="Supporting documents to prove eligibility for exemption must be uploaded",
                     mandatory=True,
                     evidence_block_ids=c.evidence_block_ids,
+                    source_page=c.source_page,
+                    evidence_snippet=c.evidence_snippet,
                     source_clause="Footnote / Proviso",
                     applicability=c.applicability,
                     extraction_confidence=c.extraction_confidence,
@@ -349,6 +376,8 @@ class TenderRequirementExtractor:
                     expected_value="Registered with Competent Authority",
                     mandatory=True,
                     evidence_block_ids=c.evidence_block_ids,
+                    source_page=c.source_page,
+                    evidence_snippet=c.evidence_snippet,
                     source_clause=c.source_clause,
                     applicability=c.applicability,
                     extraction_confidence=c.extraction_confidence,
@@ -363,6 +392,8 @@ class TenderRequirementExtractor:
                     expected_value="Affirmative undertaking certifying compliance with Clause 26",
                     mandatory=True,
                     evidence_block_ids=c.evidence_block_ids,
+                    source_page=c.source_page,
+                    evidence_snippet=c.evidence_snippet,
                     source_clause=c.source_clause,
                     applicability=c.applicability,
                     extraction_confidence=c.extraction_confidence,
@@ -382,6 +413,8 @@ class TenderRequirementExtractor:
                         expected_value="OEM Annual Turnover document",
                         mandatory=True,
                         evidence_block_ids=c.evidence_block_ids,
+                        source_page=c.source_page,
+                        evidence_snippet=c.evidence_snippet,
                         source_clause=c.source_clause or "Document required from seller",
                         applicability=c.applicability,
                         extraction_confidence=c.extraction_confidence,
@@ -397,6 +430,8 @@ class TenderRequirementExtractor:
                         expected_value="OEM Authorization Certificate",
                         mandatory=True,
                         evidence_block_ids=c.evidence_block_ids,
+                        source_page=c.source_page,
+                        evidence_snippet=c.evidence_snippet,
                         source_clause=c.source_clause or "Document required from seller",
                         applicability=c.applicability,
                         extraction_confidence=c.extraction_confidence,
@@ -412,6 +447,8 @@ class TenderRequirementExtractor:
                         expected_value="Compliance of BoQ specification and supporting document",
                         mandatory=True,
                         evidence_block_ids=c.evidence_block_ids,
+                        source_page=c.source_page,
+                        evidence_snippet=c.evidence_snippet,
                         source_clause=c.source_clause or "Document required from seller",
                         applicability=c.applicability,
                         extraction_confidence=c.extraction_confidence,
@@ -427,6 +464,8 @@ class TenderRequirementExtractor:
                         expected_value="Supporting documents to prove eligibility for exemption must be uploaded",
                         mandatory=True,
                         evidence_block_ids=c.evidence_block_ids,
+                        source_page=c.source_page,
+                        evidence_snippet=c.evidence_snippet,
                         source_clause="Footnote / Proviso",
                         applicability=c.applicability,
                         extraction_confidence=c.extraction_confidence,
@@ -526,10 +565,13 @@ class TenderRequirementExtractor:
                     if c.expected_value and not any(p in str(c.expected_value).lower() for p in ["as indicated", "as per", "bid document"]):
                         existing.expected_value = c.expected_value
 
-                # Merge evidence blocks
+                # Merge evidence blocks and preserve semantic pointers
                 for b in (c.evidence_block_ids or []):
                     if b not in existing.evidence_block_ids:
                         existing.evidence_block_ids.append(b)
+                if not getattr(existing, "evidence_snippet", None) and getattr(c, "evidence_snippet", None):
+                    existing.evidence_snippet = c.evidence_snippet
+                    existing.source_page = c.source_page
             else:
                 merged.append(CandidateRequirement(
                     description=c.description,
@@ -539,6 +581,8 @@ class TenderRequirementExtractor:
                     expected_value=c.expected_value,
                     mandatory=c.mandatory,
                     evidence_block_ids=list(c.evidence_block_ids or []),
+                    source_page=c.source_page,
+                    evidence_snippet=c.evidence_snippet,
                     source_clause=c.source_clause,
                     applicability=c.applicability,
                     extraction_confidence=c.extraction_confidence,
@@ -563,6 +607,7 @@ class TenderRequirementExtractor:
             if cleaned.endswith("```"):
                 cleaned = cleaned[:-3]
 
+            import json
             data = json.loads(cleaned.strip())
             req_list = data.get("requirements", [])
             candidates = []
@@ -575,6 +620,8 @@ class TenderRequirementExtractor:
                     expected_value=item.get("expected_value"),
                     mandatory=item.get("mandatory", True),
                     evidence_block_ids=item.get("evidence_block_ids", []),
+                    source_page=item.get("source_page", 1),
+                    evidence_snippet=item.get("evidence_snippet", ""),
                     source_clause=item.get("source_clause"),
                     applicability=item.get("applicability"),
                     extraction_confidence=item.get("extraction_confidence", "HIGH"),
@@ -582,9 +629,9 @@ class TenderRequirementExtractor:
                     source_pass=item.get("source_pass", default_source_pass),
                 ))
             return candidates
-        except Exception:
+        except Exception as e:
+            print(f"Error parsing candidates: {e}")
             return []
-
     def _normalize_expected_value(self, val: Any, field_name: Optional[str]) -> Tuple[Any, Optional[str]]:
         if val is None:
             return None, None

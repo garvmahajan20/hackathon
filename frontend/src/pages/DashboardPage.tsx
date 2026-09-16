@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -23,6 +23,8 @@ import {
   IntegrityBadge,
   OverallBadge,
 } from "../components/status/StatusBadges";
+import { apiClient } from "../api/client";
+import { AggregatedVerification } from "../types";
 
 const cardVariants = {
   hidden: { opacity: 0, y: 12 },
@@ -67,20 +69,64 @@ const getRiskMeta = (label: string) => {
 };
 
 export const DashboardPage: React.FC = () => {
+  const [liveVerifications, setLiveVerifications] = useState<AggregatedVerification[]>([]);
+  const [isLoadingVerifications, setIsLoadingVerifications] = useState<boolean>(true);
+
+  useEffect(() => {
+    let isMounted = true;
+    apiClient
+      .getVerifications()
+      .then((data) => {
+        if (isMounted && Array.isArray(data) && data.length > 0) {
+          setLiveVerifications(data);
+        }
+      })
+      .catch((err) => {
+        console.warn("Could not fetch verifications from backend:", err);
+      })
+      .finally(() => {
+        if (isMounted) setIsLoadingVerifications(false);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const displayVerifications = useMemo(() => {
+    if (liveVerifications.length > 0) {
+      return liveVerifications;
+    }
+    return SEEDED_DEMO_VERIFICATIONS;
+  }, [liveVerifications]);
+
   const failedCases = CANONICAL_DEMO_CASES.filter(
     (c) => c.expected_overall === "FAIL",
   );
   const passedCases = CANONICAL_DEMO_CASES.filter(
     (c) => c.expected_overall === "PASS",
   );
-  const reviewSignals = SEEDED_DEMO_VERIFICATIONS.reduce(
-    (total, verification) => total + verification.human_review_items.length,
-    0,
-  );
-  const contradictionCount = SEEDED_DEMO_VERIFICATIONS.reduce(
-    (total, verification) => total + verification.contradictions.length,
-    0,
-  );
+
+  const displayPassedCount = useMemo(() => {
+    return displayVerifications.filter((v) => v.overall_status === "PASS").length;
+  }, [displayVerifications]);
+
+  const displayFailedCount = useMemo(() => {
+    return displayVerifications.filter((v) => v.overall_status === "FAIL").length;
+  }, [displayVerifications]);
+
+  const reviewSignals = useMemo(() => {
+    return displayVerifications.reduce(
+      (total, verification) => total + (verification.human_review_items?.length || 0),
+      0,
+    );
+  }, [displayVerifications]);
+
+  const contradictionCount = useMemo(() => {
+    return displayVerifications.reduce(
+      (total, verification) => total + (verification.contradictions?.length || 0),
+      0,
+    );
+  }, [displayVerifications]);
 
   const attentionCases = [
     CANONICAL_DEMO_CASES.find((c) => c.bid_id === "BID-00001"),
@@ -144,7 +190,7 @@ export const DashboardPage: React.FC = () => {
             </h2>
           </div>
           <span className="hidden font-mono text-[10px] text-slate-400 sm:block">
-            4 SUBMISSIONS IN REVIEW
+            {displayVerifications.length} SUBMISSIONS IN SYSTEM
           </span>
         </div>
 
@@ -152,7 +198,7 @@ export const DashboardPage: React.FC = () => {
           {[
             {
               label: "Evaluated",
-              value: CANONICAL_DEMO_CASES.length,
+              value: displayVerifications.length,
               detail: "bid submissions",
               icon: ScanSearch,
               className: "border-slate-200 bg-white text-slate-900",
@@ -160,7 +206,7 @@ export const DashboardPage: React.FC = () => {
             },
             {
               label: "Compliant",
-              value: passedCases.length,
+              value: displayPassedCount,
               detail: "ready to proceed",
               icon: CheckCircle2,
               className: "border-emerald-200 bg-emerald-50/60 text-emerald-900",
@@ -168,7 +214,7 @@ export const DashboardPage: React.FC = () => {
             },
             {
               label: "Need action",
-              value: failedCases.length,
+              value: displayFailedCount,
               detail: "mandatory failures",
               icon: ShieldAlert,
               className: "border-rose-200 bg-rose-50/60 text-rose-900",
@@ -311,14 +357,16 @@ export const DashboardPage: React.FC = () => {
           <div className="mt-5 flex items-end gap-4">
             <div>
               <span className="font-mono text-4xl font-bold tracking-tight text-slate-900">
-                {Math.round((passedCases.length / CANONICAL_DEMO_CASES.length) * 100)}%
+                {displayVerifications.length > 0
+                  ? Math.round((displayPassedCount / displayVerifications.length) * 100)
+                  : 0}%
               </span>
               <p className="mt-1 text-[10px] font-semibold text-slate-500">clean submissions</p>
             </div>
             <div className="mb-1 h-10 w-px bg-slate-200" />
             <div>
               <span className="font-mono text-lg font-bold text-slate-700">
-                {CANONICAL_DEMO_CASES.length - passedCases.length}
+                {displayVerifications.length - displayPassedCount}
               </span>
               <p className="mt-1 text-[10px] font-semibold text-slate-500">need attention</p>
             </div>
@@ -327,7 +375,13 @@ export const DashboardPage: React.FC = () => {
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-slate-100">
             <div
               className="h-full rounded-full bg-emerald-500"
-              style={{ width: `${(passedCases.length / CANONICAL_DEMO_CASES.length) * 100}%` }}
+              style={{
+                width: `${
+                  displayVerifications.length > 0
+                    ? (displayPassedCount / displayVerifications.length) * 100
+                    : 0
+                }%`,
+              }}
             />
           </div>
 
@@ -337,14 +391,14 @@ export const DashboardPage: React.FC = () => {
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 Compliant
               </span>
-              <span className="font-mono font-bold text-slate-900">{passedCases.length}</span>
+              <span className="font-mono font-bold text-slate-900">{displayPassedCount}</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
               <span className="flex items-center gap-2 font-semibold text-slate-600">
                 <span className="h-2 w-2 rounded-full bg-rose-500" />
                 Non-compliant
               </span>
-              <span className="font-mono font-bold text-slate-900">{failedCases.length}</span>
+              <span className="font-mono font-bold text-slate-900">{displayFailedCount}</span>
             </div>
             <div className="flex items-center justify-between text-[11px]">
               <span className="flex items-center gap-2 font-semibold text-slate-600">
@@ -451,28 +505,55 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         <div className="divide-y divide-slate-100">
-          {SEEDED_DEMO_VERIFICATIONS.map((v) => {
+          {displayVerifications.slice(0, 15).map((v) => {
             const demo = CANONICAL_DEMO_CASES.find((d) => d.bid_id === v.bid_id);
+            const companyName =
+              demo?.company_name ||
+              (v.processing_metadata as any)?.company_name ||
+              (v.processing_metadata as any)?.legal_name ||
+              v.bid_id;
+            const scoreDisplay =
+              typeof v.compliance_score === "number"
+                ? `${Math.round(v.compliance_score * 100) / 100}%`
+                : null;
+            const reviewReq =
+              v.review_required ||
+              (v.human_review_items && v.human_review_items.length > 0);
+
             return (
               <Link
                 key={v.verification_id}
-                to={`/verification/${v.verification_id}`}
+                to={`/verification/${encodeURIComponent(v.verification_id)}`}
                 className="group flex flex-col gap-3 px-5 py-3.5 transition hover:bg-slate-50 sm:flex-row sm:items-center"
               >
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="truncate text-xs font-bold text-slate-900">
-                      {demo?.company_name || v.bid_id}
+                      {companyName}
                     </span>
                     <span className="hidden rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[9px] text-slate-500 sm:inline">
                       {v.bid_id}
                     </span>
+                    {scoreDisplay && (
+                      <span className="rounded bg-blue-50 px-1.5 py-0.5 font-mono text-[9px] font-bold text-blue-700">
+                        Score: {scoreDisplay}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 truncate font-mono text-[9px] text-slate-400">
-                    {v.verification_id} · {v.deterministic_run_id}
+                    {v.verification_id} {v.deterministic_run_id ? `· ${v.deterministic_run_id}` : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span
+                    className={`rounded px-1.5 py-0.5 font-mono text-[9px] font-bold ${
+                      reviewReq
+                        ? "bg-amber-100 text-amber-800"
+                        : "bg-emerald-100 text-emerald-800"
+                    }`}
+                  >
+                    Officer Review: {reviewReq ? "REQUIRED" : "NOT REQUIRED"}
+                  </span>
                   <OverallBadge status={v.overall_status} size="sm" />
                   <ComplianceBadge status={v.compliance_status} size="sm" />
                   <IntegrityBadge status={v.integrity_status} size="sm" />

@@ -49,8 +49,6 @@ export const VerificationWorkbenchPage: React.FC = () => {
     if (stateVerification && (!id || stateVerification.verification_id === id)) {
       return stateVerification;
     }
-    const foundSeeded = SEEDED_DEMO_VERIFICATIONS.find((v) => v.verification_id === id);
-    if (foundSeeded) return foundSeeded;
     return null;
   });
 
@@ -61,26 +59,20 @@ export const VerificationWorkbenchPage: React.FC = () => {
   useEffect(() => {
     if (!id) return;
 
-    const seeded = SEEDED_DEMO_VERIFICATIONS.find((v) => v.verification_id === id);
-    if (seeded) {
-      setLoadedVerification(seeded);
-      setIsLoading(false);
-      return;
-    }
-
     setIsLoading(!loadedVerification);
     setLoadError(null);
 
     Promise.all([
-      apiClient.getVerification(id).catch((err) => {
-        if (loadedVerification) return loadedVerification;
-        throw err;
-      }),
+      apiClient.getVerification(id),
       apiClient.getDossier(id).catch(() => null),
     ])
       .then(([verifData, dossierData]) => {
-        setLoadedVerification(verifData);
-        if (dossierData) setLoadedDossier(dossierData);
+        if (verifData) {
+          setLoadedVerification(verifData);
+        }
+        if (dossierData) {
+          setLoadedDossier(dossierData);
+        }
         setIsLoading(false);
 
         // Persist loaded verification ID to local storage registry
@@ -96,6 +88,18 @@ export const VerificationWorkbenchPage: React.FC = () => {
         }
       })
       .catch((err) => {
+        // Fallback to router state or seeded if backend doesn't have it
+        if (stateVerification && stateVerification.verification_id === id) {
+          setLoadedVerification(stateVerification);
+          setIsLoading(false);
+          return;
+        }
+        const seeded = SEEDED_DEMO_VERIFICATIONS.find((v) => v.verification_id === id);
+        if (seeded) {
+          setLoadedVerification(seeded);
+          setIsLoading(false);
+          return;
+        }
         console.error("Failed to load verification from backend:", err);
         setLoadError(err.detail || err.message || `Verification '${id}' not found on backend.`);
         setIsLoading(false);
@@ -105,10 +109,17 @@ export const VerificationWorkbenchPage: React.FC = () => {
   // Isolate seeded demo cases: Real requested verification IDs must NEVER fall back to demoCases[0]
   const verification = loadedVerification || (id ? null : SEEDED_DEMO_VERIFICATIONS[0]);
 
+  const DEMO_COMPANY_MAP: Record<string, string> = {
+    JARVIS_DEMO_PASS_BIDDER: "Apex Technologies Pvt Ltd (Clean Pass)",
+    JARVIS_DEMO_FAIL_BIDDER: "Apex Infrastructure Ltd (Failed Turnover/Experience)",
+    JARVIS_DEMO_FORENSIC_BIDDER: "Apex Global Dynamics (Forensic Inconsistencies)",
+  };
+
   const companyName = verification
-    ? (CANONICAL_DEMO_CASES.find((c) => c.bid_id === verification.bid_id)?.company_name ||
-        (verification.processing_metadata as any)?.legal_name ||
+    ? (DEMO_COMPANY_MAP[verification.bid_id] ||
+        CANONICAL_DEMO_CASES.find((c) => c.bid_id === verification.bid_id)?.company_name ||
         (verification.processing_metadata as any)?.company_name ||
+        (verification.processing_metadata as any)?.legal_name ||
         verification.bid_id)
     : "";
 
@@ -450,6 +461,15 @@ export const VerificationWorkbenchPage: React.FC = () => {
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 bg-slate-900 px-2.5 py-1 rounded border border-slate-800">
+            <span className="text-[10px] font-mono text-slate-400 uppercase">Score:</span>
+            <span className="font-mono text-xs font-black text-white">
+              {typeof verification.compliance_score === "number"
+                ? `${Math.round(verification.compliance_score * 100) / 100}%`
+                : "N/A"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 bg-slate-900 px-2.5 py-1 rounded border border-slate-800">
             <span className="text-[10px] font-mono text-slate-400 uppercase">Compliance:</span>
             <ComplianceBadge status={verification.compliance_status} size="sm" />
           </div>
@@ -467,6 +487,15 @@ export const VerificationWorkbenchPage: React.FC = () => {
       <div className="bg-white border border-slate-200 rounded-lg px-4 py-1.5 flex items-center justify-between text-xs shrink-0 shadow-2xs">
         <div className="flex items-center gap-4 font-mono text-[11px]">
           <div>
+            <span className="text-blue-600 mr-1 font-bold">SCORE:</span>
+            <span className="font-bold text-blue-900">
+              {typeof verification.compliance_score === "number"
+                ? `${Math.round(verification.compliance_score * 100) / 100}%`
+                : "N/A"}
+            </span>
+          </div>
+
+          <div className="border-l border-slate-200 pl-4">
             <span className="text-slate-400 mr-1">OBLIGATIONS:</span>
             <span className="font-bold text-slate-800">
               {bidderResults.length}

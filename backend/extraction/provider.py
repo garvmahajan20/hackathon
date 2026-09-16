@@ -66,3 +66,18 @@ class BaseLLMProvider(ABC):
         """
         pass
 
+
+    @abstractmethod
+    def generate_structured_from_pdf(
+        self,
+        pdf_bytes: bytes,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_schema: Optional[Dict[str, Any]] = None,
+        temperature: float = 0.0,
+        **kwargs: Any
+    ) -> LLMProviderResponse:
+        """
+        Invokes the provider with an original PDF file for native multimodal understanding.
+        """
+        pass

@@ -22,7 +22,7 @@ class GeminiProvider(BaseLLMProvider):
         model_name: Optional[str] = None,
         fallback_model: Optional[str] = None,
         max_retries: int = 2,
-        timeout_seconds: int = 30
+        timeout_seconds: int = 120
     ):
         super().__init__()
         if api_key is None:
@@ -149,6 +149,76 @@ class GeminiProvider(BaseLLMProvider):
 
         payload: Dict[str, Any] = {
             "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": temperature,
+                "responseMimeType": "application/json",
+            }
+        }
+
+        if system_prompt:
+            payload["systemInstruction"] = {
+                "parts": [{"text": system_prompt}]
+            }
+
+        if json_schema:
+            payload["generationConfig"]["responseSchema"] = json_schema
+
+        # 1. Primary Model Attempt
+        res = self._execute_request(self._model_name, payload)
+        if not res.error:
+            self.record_call(res)
+            return res
+
+        # 2. Resilient Fallback Cascade (on 404, 503, or 429 quota exhaustion)
+        err_str = res.error or ""
+        if any(code in err_str for code in ["404", "503", "429", "NOT_FOUND", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "quota"]):
+            for fallback_m in getattr(self, "_fallback_models", [self._fallback_model]):
+                if fallback_m and fallback_m != self._model_name:
+                    fallback_res = self._execute_request(fallback_m, payload)
+                    if not fallback_res.error:
+                        self.record_call(fallback_res)
+                        return fallback_res
+
+        self.record_call(res)
+        return res
+
+    def generate_structured_from_pdf(
+        self,
+        pdf_bytes: bytes,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_schema: Optional[Dict[str, Any]] = None,
+        temperature: float = 0.0,
+        **kwargs: Any
+    ) -> LLMProviderResponse:
+        import base64
+        
+        if not self.is_available():
+            return LLMProviderResponse(
+                content="",
+                model_name=self.model_name,
+                error="GEMINI_API_KEY is not configured in environment.",
+                is_mock=False,
+                is_cached=False,
+            )
+
+        b64_pdf = base64.b64encode(pdf_bytes).decode("utf-8")
+
+        payload: Dict[str, Any] = {
+            "contents": [{
+                "role": "user", 
+                "parts": [
+                    {
+                        "inlineData": {
+                            "mimeType": "application/pdf",
+                            "data": b64_pdf
+                        }
+                    },
+                    {
+                        "text": prompt
+                    }
+                ]
+            }],
             "generationConfig": {
                 "temperature": temperature,
                 "responseMimeType": "application/json",

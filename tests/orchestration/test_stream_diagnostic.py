@@ -132,6 +132,7 @@ class TestStreamDiagnosticTelemetry(unittest.TestCase):
             return resp
 
         orch.provider.generate_structured = mock_generate_structured
+        orch.provider.generate_structured_from_pdf = lambda pdf_bytes, prompt, **kwargs: mock_generate_structured(prompt, **kwargs)
         orch.provider.is_available = lambda: True
 
         # Run verification with progress tracking
@@ -165,11 +166,11 @@ class TestStreamDiagnosticTelemetry(unittest.TestCase):
         self.assertIn("total_backend_elapsed_ms", telemetry)
         self.assertGreater(telemetry["total_backend_elapsed_ms"], 0.0)
 
-        # 4. number of Gemini provider calls (8 page Pass 1 + 1 Pass 2 + 1 Bidder = 10)
-        self.assertEqual(telemetry["number_of_gemini_provider_calls"], 10)
+        # 4. number of Gemini provider calls (native PDF architecture: 1 Pass 1 + 1 Pass 2 + 1 Bidder = 3 calls)
+        self.assertEqual(telemetry["number_of_gemini_provider_calls"], 3)
 
-        # 5. tender requirement Gemini call count (8 Pass 1 + 1 Pass 2 = 9)
-        self.assertEqual(telemetry["tender_requirement_gemini_call_count"], 9)
+        # 5. tender requirement Gemini call count (1 Pass 1 + 1 Pass 2 = 2 calls)
+        self.assertEqual(telemetry["tender_requirement_gemini_call_count"], 2)
 
         # 6. bidder fact Gemini call count (1 call for bidder document)
         self.assertEqual(telemetry["bidder_fact_gemini_call_count"], 1)
@@ -196,7 +197,7 @@ class TestStreamDiagnosticTelemetry(unittest.TestCase):
         step6_events = [e for e in progress_events if e["step"] == 6 and e["status"] == "COMPLETED"]
         self.assertEqual(len(step6_events), 1)
         self.assertIn("diagnostic_telemetry", step6_events[0]["meta"])
-        self.assertEqual(step6_events[0]["meta"]["diagnostic_telemetry"]["number_of_gemini_provider_calls"], 10)
+        self.assertEqual(step6_events[0]["meta"]["diagnostic_telemetry"]["number_of_gemini_provider_calls"], 3)
 
     def test_02_verify_stream_endpoint_emits_telemetry_in_sse(self):
         """

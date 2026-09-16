@@ -347,3 +347,74 @@ class EvidenceGrounder:
             raw_snippet="\n".join(snippets)[:500],
         )
 
+
+    def ground_by_semantic_pointer(
+        self,
+        source_page: int,
+        evidence_snippet: str,
+        expected_value: Any = None,
+        description: str = ""
+    ) -> GroundingValidationResult:
+        import difflib
+        
+        if not evidence_snippet:
+            return GroundingValidationResult(
+                is_valid=False,
+                status=ExtractionStatus.GROUNDING_FAILED,
+                errors=["No evidence_snippet supplied by extraction candidate."],
+            )
+
+        resolved_evidence: List[Dict[str, Any]] = []
+        errors: List[str] = []
+        warnings: List[str] = []
+
+        # Find best matching block on the page
+        best_block = None
+        best_ratio = 0.0
+        
+        # We search across all pages if source_page is wildly off, but prefer source_page
+        pages_to_search = [p for p in self.extraction_result.pages if p.page_number == source_page]
+        if not pages_to_search:
+            pages_to_search = self.extraction_result.pages
+
+        for page in pages_to_search:
+            for block in page.blocks:
+                ratio = difflib.SequenceMatcher(None, evidence_snippet.lower(), block.text.lower()).ratio()
+                # Also check containment
+                if evidence_snippet.lower() in block.text.lower():
+                    ratio = max(ratio, 0.9)
+                if block.text.lower() in evidence_snippet.lower() and len(block.text) > 10:
+                    ratio = max(ratio, 0.8)
+                    
+                if ratio > best_ratio:
+                    best_ratio = ratio
+                    best_block = (page.page_number, block)
+
+        if best_block and best_ratio > 0.4:
+            page_num, block = best_block
+            resolved_evidence.append({
+                "block_id": block.block_id,
+                "document": self.doc_name,
+                "document_id": self.doc_id,
+                "page": page_num,
+                "bbox": block.bbox,
+                "snippet": block.text,
+                "source_type": "NATIVE_PDF_SEMANTIC",
+            })
+            
+            return GroundingValidationResult(
+                is_valid=True,
+                status=ExtractionStatus.ACCEPTED,
+                errors=[],
+                warnings=[],
+                resolved_evidence=resolved_evidence,
+                primary_page=page_num,
+                primary_bbox=block.bbox,
+                raw_snippet=block.text
+            )
+        else:
+            return GroundingValidationResult(
+                is_valid=False,
+                status=ExtractionStatus.GROUNDING_FAILED,
+                errors=[f"Could not find physical block matching semantic snippet: {evidence_snippet[:100]}"],
+            )

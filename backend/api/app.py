@@ -253,6 +253,10 @@ async def verify_bid(
                 detail=str(ve),
             )
 
+        if orch is not _orchestrator:
+            _orchestrator._verifications[aggregated.verification_id] = aggregated
+            _orchestrator._dossiers[aggregated.verification_id] = _
+
         return aggregated.to_dict()
 
     finally:
@@ -314,6 +318,9 @@ async def verify_bid_stream(
                 company_name_hint=company_name,
                 progress_callback=sync_progress_callback,
             )
+            if orch is not _orchestrator:
+                _orchestrator._verifications[aggregated.verification_id] = aggregated
+                _orchestrator._dossiers[aggregated.verification_id] = _
             diag = (aggregated.processing_metadata or {}).get("diagnostic_telemetry", {})
             loop.call_soon_threadsafe(
                 queue.put_nowait,

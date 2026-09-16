@@ -44,6 +44,16 @@ class LLMBidderFactExtractor(BaseFactExtractor):
         self.strict_grounding = strict_grounding if strict_grounding is not None else (mode != LLMMode.MOCK)
         self.last_extraction_source: str = "FRESH" if self.mode == LLMMode.LIVE else ("MOCK" if getattr(self.provider, "is_mock", False) else "CACHED")
 
+
+    def _read_pdf_bytes(self, filepath: str) -> bytes:
+        import os
+        if not filepath or not os.path.exists(filepath):
+            if self.mode == LLMMode.MOCK or getattr(self.provider, "is_mock", False):
+                return b"%PDF-1.4-MOCK"
+            raise FileNotFoundError(f"PDF not found at {filepath}")
+        with open(filepath, 'rb') as f:
+            return f.read()
+
     def extract_facts(
         self,
         extraction_result: ExtractionResult,
@@ -61,6 +71,7 @@ class LLMBidderFactExtractor(BaseFactExtractor):
             model_name=self.provider.model_name,
             prompt_version=FACT_PROMPT_VERSION,
             prompt_content=prompt,
+            pdf_sha256=extraction_result.metadata.sha256,
         )
 
         response_text = ""
@@ -72,7 +83,9 @@ class LLMBidderFactExtractor(BaseFactExtractor):
                 is_from_cache = True
 
         if not response_text:
-            resp = self.provider.generate_structured(
+            pdf_bytes = self._read_pdf_bytes(extraction_result.metadata.file_path)
+            resp = self.provider.generate_structured_from_pdf(
+                pdf_bytes=pdf_bytes,
                 prompt=prompt,
                 system_prompt=BIDDER_FACT_SYSTEM_PROMPT,
             )
@@ -102,13 +115,21 @@ class LLMBidderFactExtractor(BaseFactExtractor):
         validated_facts: List[BidderFact] = []
 
         for idx, cand in enumerate(candidate_facts):
-            # Ground evidence in Step 6 blocks
-            ground_res = grounder.ground_fact(
-                candidate_block_ids=cand.evidence_block_ids,
-                raw_value=cand.raw_value,
-                field_name=cand.field,
-                strict=effective_strict,
-            )
+            # Ground evidence: native PDF semantic pointer grounding preferred, with legacy block ID fallback
+            if cand.evidence_snippet:
+                ground_res = grounder.ground_by_semantic_pointer(
+                    source_page=cand.source_page,
+                    evidence_snippet=cand.evidence_snippet,
+                )
+            elif cand.evidence_block_ids:
+                ground_res = grounder.ground_fact(
+                    candidate_block_ids=cand.evidence_block_ids,
+                    raw_value=cand.raw_value,
+                    field_name=cand.field,
+                    strict=effective_strict,
+                )
+            else:
+                continue
 
             if not ground_res.is_valid:
                 # Evidence grounding failed: reject ungrounded fact
@@ -174,6 +195,8 @@ class LLMBidderFactExtractor(BaseFactExtractor):
                     field=item.get("field", ""),
                     raw_value=item.get("raw_value"),
                     evidence_block_ids=item.get("evidence_block_ids", []),
+                    source_page=item.get("source_page", 1),
+                    evidence_snippet=item.get("evidence_snippet", ""),
                     extraction_confidence=item.get("extraction_confidence", "HIGH"),
                     metadata=item.get("metadata"),
                 ))

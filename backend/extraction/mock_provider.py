@@ -131,6 +131,8 @@ class MockLLMProvider(BaseLLMProvider):
                 "operator": ">=",
                 "expected_value": val,
                 "mandatory": True,
+                "source_page": 1,
+                "evidence_snippet": f"turnover of {val}",
                 "evidence_block_ids": [b_id] if b_id else [],
                 "source_clause": "Clause 4.1",
             })
@@ -147,6 +149,8 @@ class MockLLMProvider(BaseLLMProvider):
                 "operator": ">=",
                 "expected_value": val,
                 "mandatory": True,
+                "source_page": 1,
+                "evidence_snippet": f"warranty of {val}",
                 "evidence_block_ids": [b_id] if b_id else [],
                 "source_clause": "Clause 8.2",
             })
@@ -163,6 +167,8 @@ class MockLLMProvider(BaseLLMProvider):
                 "operator": "<=",
                 "expected_value": val,
                 "mandatory": True,
+                "source_page": 1,
+                "evidence_snippet": f"Delivery within {val}",
                 "evidence_block_ids": [b_id] if b_id else [],
             })
 
@@ -176,6 +182,8 @@ class MockLLMProvider(BaseLLMProvider):
                 "operator": "EXISTS",
                 "expected_value": "Valid GSTIN",
                 "mandatory": True,
+                "source_page": 1,
+                "evidence_snippet": "GSTIN registration",
                 "evidence_block_ids": [b_id] if b_id else [],
                 "source_clause": "Clause 2.1",
             })
@@ -190,6 +198,8 @@ class MockLLMProvider(BaseLLMProvider):
                 "operator": "EXISTS",
                 "expected_value": "Valid PAN",
                 "mandatory": True,
+                "source_page": 1,
+                "evidence_snippet": "Permanent Account Number",
                 "evidence_block_ids": [b_id] if b_id else [],
                 "source_clause": "Clause 2.2",
             })
@@ -204,6 +214,8 @@ class MockLLMProvider(BaseLLMProvider):
                 "operator": "EXISTS",
                 "expected_value": "ISO 9001",
                 "mandatory": True,
+                "source_page": 1,
+                "evidence_snippet": "ISO certification",
                 "evidence_block_ids": [b_id] if b_id else [],
                 "source_clause": "Clause 5.1",
             })
@@ -223,6 +235,8 @@ class MockLLMProvider(BaseLLMProvider):
             facts.append({
                 "field": "gstin",
                 "raw_value": raw_gst,
+                "source_page": 1,
+                "evidence_snippet": raw_gst,
                 "evidence_block_ids": [b_id] if b_id else [],
                 "extraction_confidence": "HIGH",
             })
@@ -235,6 +249,8 @@ class MockLLMProvider(BaseLLMProvider):
             facts.append({
                 "field": "pan",
                 "raw_value": raw_pan,
+                "source_page": 1,
+                "evidence_snippet": raw_pan,
                 "evidence_block_ids": [b_id] if b_id else [],
                 "extraction_confidence": "HIGH",
             })
@@ -248,6 +264,8 @@ class MockLLMProvider(BaseLLMProvider):
                 facts.append({
                     "field": "turnover_cr",
                     "raw_value": raw_to,
+                    "source_page": 1,
+                    "evidence_snippet": raw_to,
                     "evidence_block_ids": [b_id] if b_id else [],
                     "extraction_confidence": "HIGH",
                 })
@@ -261,6 +279,8 @@ class MockLLMProvider(BaseLLMProvider):
                 facts.append({
                     "field": "warranty_years",
                     "raw_value": raw_war,
+                    "source_page": 1,
+                    "evidence_snippet": raw_war,
                     "evidence_block_ids": [b_id] if b_id else [],
                     "extraction_confidence": "HIGH",
                 })
@@ -274,6 +294,8 @@ class MockLLMProvider(BaseLLMProvider):
                 facts.append({
                     "field": "delivery_days",
                     "raw_value": raw_del,
+                    "source_page": 1,
+                    "evidence_snippet": raw_del,
                     "evidence_block_ids": [b_id] if b_id else [],
                     "extraction_confidence": "HIGH",
                 })
@@ -286,8 +308,35 @@ class MockLLMProvider(BaseLLMProvider):
             facts.append({
                 "field": "iso_cert",
                 "raw_value": raw_iso,
+                "source_page": 1,
+                "evidence_snippet": raw_iso,
                 "evidence_block_ids": [b_id] if b_id else [],
                 "extraction_confidence": "HIGH",
             })
 
         return facts
+
+    def generate_structured_from_pdf(
+        self,
+        pdf_bytes: bytes,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_schema: Optional[Dict[str, Any]] = None,
+        temperature: float = 0.0,
+        **kwargs: Any
+    ) -> LLMProviderResponse:
+        if self._canned_response is not None or self._custom_handler is not None:
+            return self.generate_structured(prompt, system_prompt, json_schema, temperature, **kwargs)
+        
+        extracted_pdf_text = ""
+        try:
+            import fitz
+            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+            for page in doc:
+                extracted_pdf_text += "\n" + page.get_text()
+            doc.close()
+        except Exception:
+            pass
+
+        augmented_prompt = prompt + "\n" + extracted_pdf_text
+        return self.generate_structured(augmented_prompt, system_prompt, json_schema, temperature, **kwargs)

@@ -66,6 +66,17 @@ class TrackingDummyProvider(BaseLLMProvider):
             is_cached=False,
         )
 
+    def generate_structured_from_pdf(
+        self,
+        pdf_bytes: bytes,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        json_schema: Optional[Dict[str, Any]] = None,
+        temperature: float = 0.0,
+        **kwargs: Any
+    ) -> LLMProviderResponse:
+        return self.generate_structured(prompt, system_prompt, json_schema, temperature, **kwargs)
+
 class FailingProvider(BaseLLMProvider):
     """
     Provider that raises an exception if invoked.
@@ -86,6 +97,10 @@ class FailingProvider(BaseLLMProvider):
         return True
 
     def generate_structured(self, *args, **kwargs) -> LLMProviderResponse:
+        self.call_count += 1
+        raise AssertionError("Provider was invoked when cache should have been used!")
+
+    def generate_structured_from_pdf(self, *args, **kwargs) -> LLMProviderResponse:
         self.call_count += 1
         raise AssertionError("Provider was invoked when cache should have been used!")
 
