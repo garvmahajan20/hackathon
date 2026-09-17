@@ -1,9 +1,8 @@
 [build]
 builder = "RAILPACK"
-buildCommand = "python -m pip install -r requirements.txt && python -m pip install jsonschema && sed -i '772d' backend/orchestration/orchestrator.py"
 
 [deploy]
-startCommand = "python -m uvicorn backend.api.app:app --host 0.0.0.0 --port $PORT"
+startCommand = "bash railway_start.sh"
 healthcheckPath = "/health"
 healthcheckTimeout = 120
 restartPolicyType = "ON_FAILURE"
